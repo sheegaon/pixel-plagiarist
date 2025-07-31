@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Pixel Plagiarist</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="game-header">
+            <h1 class="game-title">🎨 Pixel Plagiarist</h1>
+        </div>
+        
+        <div class="main-content">
+            <div class="screen active">
+                <h2>Welcome to Pixel Plagiarist!</h2>
+                <p>A multiplayer drawing game where you create, copy, and vote!</p>
+                
+                <div class="login-section">
+                    <h3>Choose how to sign in</h3>
+                    
+                    <!-- Username Login Option -->
+                    <div class="username-login">
+                        <h4>Quick Play</h4>
+                        <form action="{{ url_for('username_auth') }}" method="POST">
+                            <div class="form-group">
+                                <input type="text" 
+                                       name="username" 
+                                       placeholder="Enter your username" 
+                                       maxlength="20" 
+                                       required
+                                       class="username-input">
+                            </div>
+                            <button type="submit" class="username-login-btn">
+                                🎨 Play as Guest
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <div class="login-divider">
+                        <span>OR</span>
+                    </div>
+                    
+                    <!-- Google OAuth Login Option -->
+                    <div class="oauth-login">
+                        <h4>Sign in with Google</h4>
+                        <p class="oauth-description">Link your Google account for persistent stats and leaderboard tracking</p>
+                        <a href="{{ url_for('google_auth') }}" class="google-login-btn">
+                            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" width="20" height="20">
+                            Sign in with Google
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

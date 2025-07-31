@@ -1,0 +1,116 @@
+/* Responsive design for mobile and tablet devices */
+
+@media (max-width: 768px) {
+    .game-title {
+        font-size: 2rem;
+    }
+    
+    .game-info {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .drawing-tools {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .tool-btn {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    #drawingCanvas, #copyingCanvas {
+        width: 100%;
+        max-width: 400px;
+        height: 300px;
+    }
+    
+    .voting-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .player-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .container {
+        padding: 5px;
+    }
+    
+    .screen {
+        padding: 15px;
+    }
+    
+    .color-picker {
+        gap: 6px;
+    }
+    
+    .color-option {
+        width: 25px;
+        height: 25px;
+    }
+}
+
+@media (max-width: 480px) {
+    .game-title {
+        font-size: 1.5rem;
+    }
+    
+    .info-item {
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+    
+    input, button, select {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .tool-btn {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+    
+    .timer {
+        font-size: 1.2rem;
+        padding: 8px;
+    }
+    
+    .phase-indicator {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Landscape orientation adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+    .game-header {
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .game-title {
+        font-size: 1.5rem;
+        margin-bottom: 5px;
+    }
+    
+    .screen {
+        padding: 10px;
+    }
+    
+    .canvas-container {
+        margin: 10px 0;
+    }
+    
+    #drawingCanvas, #copyingCanvas {
+        max-height: 200px;
+    }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
+    #drawingCanvas, #copyingCanvas {
+        image-rendering: pixelated;
+    }
+}

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Plagiarist</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🎨</text></svg>">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="game-header">
+            <h1 class="game-title">
+                🎨 Pixel Plagiarist
+            </h1>
+            <div class="game-info">
+                <div class="info-item" id="balanceInfo">Balance: $100</div>
+                <div class="info-item hidden" id="roomInfo">Room: -</div>
+                
+                {% if user %}
+                <div class="user-info">
+                    <img src="{{ user.picture }}" alt="{{ user.name }}" class="user-avatar">
+                    <span>{{ user.name }}</span>
+                    <a href="{{ url_for('leaderboard') }}" class="logout-btn">🏆 Leaderboard</a>
+                    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Home Screen -->
+            <div class="screen active" id="homeScreen">
+                <h2>Welcome back{% if user %}, {{ user.name }}{% endif %}!</h2>
+                <p>Ready to create, copy, and compete?</p>
+
+                <div class="room-sections">
+                    <div class="room-section">
+                        <div class="room-section-header">
+                            <h3>Available Rooms</h3>
+                            <button onclick="uiManager.showJoinCodeModal()" class="join-code-btn">🔑 Join by Room Code</button>
+                        </div>
+                        <div id="roomList" class="room-list">
+                            <div class="no-rooms">No active rooms. Create one to get started!</div>
+                        </div>
+                        <button onclick="gameManager.refreshRoomList()" class="refresh-btn">🔄 Refresh</button>
+                    </div>
+
+                    <div class="room-section">
+                        <h3>Create Room</h3>
+                        <div class="stake-buttons">
+                            <button onclick="gameManager.createRoomWithStake(10)" class="stake-btn">Create $10 Minimum Room</button>
+                            <button onclick="gameManager.createRoomWithStake(25)" class="stake-btn">Create $25 Minimum Room</button>
+                            <button onclick="gameManager.createRoomWithStake(100)" class="stake-btn">Create $100 Minimum Room</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="errorDisplay" class="error-message" style="display: none;"></div>
+            </div>
+
+            <!-- Waiting Screen -->
+            <div class="screen" id="waitingScreen">
+                <div class="phase-indicator">Waiting for Players</div>
+                <div id="waitingMessage">
+                    <p>Minimum 3 players required to start.</p>
+                </div>
+                <div class="player-list" id="playerList"></div>
+                <div id="countdownDisplay" style="display: none;">
+                    <div class="timer" id="countdownTimer">20</div>
+                    <p>Game starting soon!</p>
+                </div>
+                <div class="waiting-actions">
+                    <button onclick="gameManager.leaveRoom()" class="leave-room-btn">🚪 Leave Room</button>
+                </div>
+            </div>
+
+            <!-- Betting Screen -->
+            <div class="screen" id="bettingScreen">
+                <div class="phase-indicator">Betting Phase</div>
+                <div id="promptDisplay" class="result-item">
+                    <h3>Your Drawing Prompt:</h3>
+                    <p id="promptText"></p>
+                </div>
+                
+                <div class="form-group">
+                    <label>Choose Your Stake:</label>
+                    <div class="stake-buttons" id="stakeButtons">
+                        <!-- Buttons will be populated by betting manager -->
+                    </div>
+                    <div class="stake-display">
+                        Your stake: $<span id="stakeAmount">10</span><br>
+                        Remaining tokens after bet: $<span id="remainingTokens">90</span>
+                    </div>
+                </div>
+                
+                <button onclick="gameManager.placeBet()" id="betButton">Place Bet</button>
+                <div class="timer" id="bettingTimer">10</div>
+            </div>
+
+            <!-- Drawing Screen -->
+            <div class="screen" id="drawingScreen">
+                <div class="phase-indicator">Drawing Phase</div>
+                <div id="drawingPromptDisplay" class="result-item">
+                    <h3>Draw:</h3>
+                    <p id="drawingPromptText"></p>
+                </div>
+
+                <div class="canvas-container">
+                    <div class="drawing-tools">
+                        <div class="tool-btn" onclick="drawingCanvas.undoStroke()">↶ Undo</div>
+                    </div>
+
+                    <canvas id="drawingCanvas" width="400" height="300"></canvas>
+                </div>
+
+                <button onclick="drawingCanvas.submitDrawing('original')" id="submitDrawingBtn">Submit Drawing</button>
+                <div class="timer" id="drawingTimer">60</div>
+            </div>
+
+            <!-- Copying Screen -->
+            <div class="screen" id="copyingScreen">
+                <div class="phase-indicator">Copying Phase</div>
+                <div id="copyingInstructions" class="result-item">
+                    <h3>Copy the drawing shown to you</h3>
+                    <p>Recreate them as accurately as possible!</p>
+                </div>
+
+                <div id="copyTargets"></div>
+
+                <div class="canvas-container">
+                    <div class="drawing-tools">
+                        <div class="tool-btn" onclick="drawingCanvas.undoStroke()">↶ Undo</div>
+                    </div>
+
+                    <canvas id="copyingCanvas" width="400" height="300"></canvas>
+                </div>
+
+                <button onclick="gameManager.submitCurrentCopy()" id="submitCopyBtn" disabled>Submit Copy</button>
+                <div class="timer" id="copyingTimer">60</div>
+            </div>
+
+            <!-- Voting Screen -->
+            <div class="screen" id="votingScreen">
+                <div class="phase-indicator">Voting Phase</div>
+                <div id="votingInstructions" class="result-item">
+                    <h3 id="votingPrompt">Which drawing is the ORIGINAL?</h3>
+                    <p>Set <span id="votingSetInfo">1 of 3</span></p>
+                </div>
+
+                <div class="voting-grid" id="votingGrid"></div>
+                
+                <button onclick="gameManager.submitVote()" id="submitVoteBtn" disabled>Submit Vote</button>
+                <div class="timer" id="votingTimer">10</div>
+            </div>
+
+            <!-- Results Screen -->
+            <div class="screen" id="resultsScreen">
+                <div class="phase-indicator">Game Results</div>
+                <div class="results-grid" id="resultsGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Overlay -->
+    <div class="review-overlay" id="reviewOverlay">
+        <div class="review-content">
+            <h3>Review Original Drawing</h3>
+            <img id="reviewImage" src="" alt="Original drawing">
+            <p id="reviewCountdown">5</p>
+        </div>
+    </div>
+
+    <!-- Original Drawing Overlay -->
+    <div class="review-overlay" id="originalOverlay">
+        <div class="review-content">
+            <h3>Original Drawing to Copy</h3>
+            <img id="originalImage" src="" alt="Original drawing to copy">
+            <p id="originalCountdown">5</p>
+        </div>
+    </div>
+
+    <!-- Room Code Modal -->
+    <div class="modal" id="joinCodeModal">
+        <div class="modal-content">
+            <span class="close" onclick="uiManager.hideJoinCodeModal()">&times;</span>
+            <h2>Join Room by Code</h2>
+            <div class="form-group">
+                <label for="roomCodeInputModal">Room Code:</label>
+                <input type="text" id="roomCodeInputModal" placeholder="Enter room code">
+            </div>
+            <button onclick="gameManager.joinRoomByCode()">Join Room</button>
+            <div id="modalErrorDisplay" class="error-message" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script>
+        // Pass server-side user data to client-side JavaScript
+        window.gameUserData = {
+            username: "{{ user.name if user else 'Anonymous' }}",
+            email: "{{ user.email if user else '' }}",
+            picture: "{{ user.picture if user else '' }}"
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    
+    <!-- Load specialized managers first -->
+    <script src="{{ url_for('static', filename='js/managers/room-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/player-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/game-state-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/betting-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/drawing-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/copying-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/voting-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/results-manager.js') }}"></script>
+    
+    <!-- Load core modules -->
+    <script src="{{ url_for('static', filename='js/drawing-canvas.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/socket-handler.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui-manager.js') }}"></script>
+    
+    <!-- Load main coordinator last -->
+    <script src="{{ url_for('static', filename='js/game-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

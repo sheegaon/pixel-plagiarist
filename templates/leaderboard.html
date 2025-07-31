@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard - Pixel Plagiarist</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="game-header">
+            <h1 class="game-title">🏆 Pixel Plagiarist Leaderboard</h1>
+            <div class="game-info">
+                {% if user %}
+                <div class="user-info">
+                    <img src="{{ user.picture }}" alt="{{ user.name }}" class="user-avatar">
+                    <span>{{ user.name }}</span>
+                    <a href="{{ url_for('index') }}" class="logout-btn">Back to Game</a>
+                    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="screen active">
+                <h2>Top Players</h2>
+                <p>Rankings based on total points earned across all games</p>
+                
+                {% if leaderboard %}
+                <div class="leaderboard-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Player</th>
+                                <th>Total Points</th>
+                                <th>Games Played</th>
+                                <th>Avg Points/Game</th>
+                                <th>Successful Originals</th>
+                                <th>Successful Copies</th>
+                                <th>Original Success Rate</th>
+                                <th>Copy Success Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for player in leaderboard %}
+                            <tr class="{% if loop.index <= 3 %}top-player rank-{{ loop.index }}{% endif %}">
+                                <td class="rank">
+                                    {% if loop.index == 1 %}🥇
+                                    {% elif loop.index == 2 %}🥈
+                                    {% elif loop.index == 3 %}🥉
+                                    {% else %}{{ loop.index }}
+                                    {% endif %}
+                                </td>
+                                <td class="username">{{ player.username }}</td>
+                                <td class="points">{{ player.total_points }}</td>
+                                <td>{{ player.games_played }}</td>
+                                <td>{{ player.avg_points_per_game }}</td>
+                                <td>{{ player.successful_originals }}</td>
+                                <td>{{ player.successful_copies }}</td>
+                                <td>{{ player.original_success_rate }}%</td>
+                                <td>{{ player.copy_success_rate }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="no-data">
+                    <p>No games have been played yet. Be the first to start climbing the leaderboard!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
