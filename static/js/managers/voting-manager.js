@@ -2,18 +2,16 @@
 class VotingManager {
     constructor() {
         this.selectedDrawingId = null;
-        this.currentVotingSet = null;
         this.voteSubmitted = false;
-        this.totalSets = 0;
-        this.currentSetIndex = 0;
+        this.total_sets = 0;
+        this.set_index = 0;
+        this.drawings = [];
     }
 
     initializeVoting(data) {
         this.selectedDrawingId = null;
         this.voteSubmitted = false;
-        this.currentVotingSet = data;
-        this.totalSets = data.total_sets;
-        this.currentSetIndex = data.set_index;
+        this.set_index = data.set_index;
         
         uiManager.showView('voting');
         this.displayVotingInterface(data);
@@ -99,6 +97,12 @@ class VotingManager {
     }
 
     submitVote() {
+        // Validate current phase before allowing vote submission
+        if (gameStateManager.getPhase() !== GameConfig.PHASES.VOTING) {
+            uiManager.showError('Cannot vote during this phase');
+            return;
+        }
+
         if (!this.selectedDrawingId) {
             uiManager.showError('Please select a drawing first');
             return;
@@ -131,9 +135,9 @@ class VotingManager {
     }
 
     autoSubmitRandomVote() {
-        if (this.voteSubmitted || !this.currentVotingSet) return;
+        if (this.voteSubmitted) return;
         
-        const drawings = this.currentVotingSet.drawings;
+        const drawings = this.drawings;
         if (!drawings || drawings.length === 0) return;
         
         // Select random drawing
@@ -186,28 +190,16 @@ class VotingManager {
         }
     }
 
-    getSelectedDrawingId() {
-        return this.selectedDrawingId;
-    }
-
     isVoteSubmitted() {
         return this.voteSubmitted;
     }
 
-    getCurrentSetIndex() {
-        return this.currentSetIndex;
-    }
-
-    getTotalSets() {
-        return this.totalSets;
-    }
-
     reset() {
         this.selectedDrawingId = null;
-        this.currentVotingSet = null;
         this.voteSubmitted = false;
-        this.totalSets = 0;
-        this.currentSetIndex = 0;
+        this.total_sets = 0;
+        this.set_index = 0;
+        this.drawings = [];
         
         const submitButton = document.getElementById('submitVoteBtn');
         if (submitButton) {

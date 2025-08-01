@@ -1,8 +1,8 @@
 # Connection handling for socket events
 from flask import request
 from flask_socketio import emit
-from logging_utils import debug_log
-from .game_state import game_state, get_room_info, broadcast_room_list
+from util.logging_utils import debug_log
+from .game_state import game_state_sh, get_room_info, broadcast_room_list
 
 
 class ConnectionHandlers:
@@ -20,7 +20,7 @@ class ConnectionHandlers:
         # If no rooms exist, create a default $10 room
         if not rooms:
             try:
-                new_room_id = game_state.ensure_default_room()
+                new_room_id = game_state_sh.ensure_default_room()
                 if new_room_id:
                     debug_log("Created default room on client connect", None, new_room_id, {'min_stake': 10})
                     # Send updated room list with the new room
@@ -33,21 +33,21 @@ class ConnectionHandlers:
         """Handle player disconnect"""
         player_id = request.sid
 
-        if player_id in game_state.PLAYERS:
-            room_id = game_state.get_player_room(player_id)
-            game_state.remove_player(player_id)
+        if player_id in game_state_sh.PLAYERS:
+            room_id = game_state_sh.get_player_room(player_id)
+            game_state_sh.remove_player(player_id)
 
-            if room_id in game_state.GAMES:
-                game = game_state.get_game(room_id)
+            if room_id in game_state_sh.GAMES:
+                game = game_state_sh.get_game(room_id)
                 game.remove_player(player_id)
 
                 # Clean up empty games
                 if len(game.players) == 0:
                     debug_log("Room is empty after disconnect, deleting", None, room_id)
-                    game_state.remove_game(room_id)
+                    game_state_sh.remove_game(room_id)
                     
                     # After deleting a room, ensure there's still a default $10 room available
-                    new_room_id = game_state.ensure_default_room()
+                    new_room_id = game_state_sh.ensure_default_room()
                     if new_room_id:
                         debug_log("Created replacement default room after disconnect deletion", None, new_room_id, {'min_stake': 10})
                     

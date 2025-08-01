@@ -78,7 +78,7 @@ class UIManager {
     }
 
     startCountdown(seconds) {
-        const timer = document.getElementById('countdownTimer');
+        const timer = document.getElementById('joiningTimer');
         let timeLeft = seconds;
         
         const interval = setInterval(() => {

@@ -1,12 +1,11 @@
 # Game state management for socket handlers
 import uuid
-from datetime import datetime
 from flask_socketio import emit
-from game_logic import PixelPlagiarist
-from logging_utils import debug_log
+from game_logic import GameStateGL
+from util.logging_utils import debug_log
 
 
-class GameState:
+class GameStateSH:
     """Centralized game state management for socket handlers"""
     
     def __init__(self):
@@ -58,7 +57,7 @@ class GameState:
         if not has_waiting_ten_dollar_room:
             # Create a new $10 room
             room_id = str(uuid.uuid4())[:8].upper()
-            new_game = PixelPlagiarist(room_id, 10)
+            new_game = GameStateGL(room_id, 10)
             self.GAMES[room_id] = new_game
             debug_log("Created guaranteed $10 room", None, room_id, {'min_stake': 10})
             return room_id
@@ -76,7 +75,7 @@ class GameState:
 
 
 # Global game state instance
-game_state = GameState()
+game_state_sh = GameStateSH()
 
 
 def get_room_info(state=None):
@@ -94,10 +93,14 @@ def get_room_info(state=None):
         List of room information dictionaries
     """
     if state is None:
-        state = game_state
+        state = game_state_sh
         
     rooms = []
     for room_id, game in state.get_all_games().items():
+        # Only include rooms in waiting phase
+        if game.phase != "waiting":
+            continue
+
         # Include player details to help AI players identify human vs AI players
         player_details = []
         for player_id, player_data in game.players.items():
@@ -125,7 +128,7 @@ def get_room_info(state=None):
 def broadcast_room_list(socketio=None, state=None):
     """Broadcast updated room list to all clients on home screen."""
     if state is None:
-        state = game_state
+        state = game_state_sh
         
     rooms = get_room_info(state)
     if socketio:

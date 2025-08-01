@@ -340,14 +340,14 @@ class PixelPlagiaristAI:
         """
         Check if the current room still has human players based on player list update.
         Leave the room if only AI players remain.
-        
+
         Parameters
         ----------
         players : Iterable
             List of current players in the room
         """
-        if not self.room_id or self.game_phase != "waiting":
-            # Don't leave during active games
+        if not self.room_id:
+            # Not in a room, nothing to check
             return
 
         human_players = []
@@ -366,11 +366,11 @@ class PixelPlagiaristAI:
         print(f"   Humans: {human_players}")
         print(f"   AIs: {ai_players}")
 
-        if len(human_players) == 0 and len(players) > 1:
-            # Room has only AI players - leave it
+        if len(human_players) == 0:
+            # Room has no human players - leave it
             print(f"🚪 {self.name}: Leaving room {self.room_id} - no human players remaining")
             self.leave_room()
-        elif len(human_players) > 0:
+        else:
             print(f"✅ {self.name}: Staying in room {self.room_id} - found {len(human_players)} human player(s)")
 
     def leave_room(self):
@@ -458,7 +458,7 @@ class PixelPlagiaristAI:
 
         drawing_data = self.create_simple_drawing(chosen_shape)
 
-        self.sio.emit('submit_drawing', {
+        self.sio.emit('submit_original', {
             'drawing_data': drawing_data  # Fixed: use 'drawing_data' not 'drawing'
         })
 

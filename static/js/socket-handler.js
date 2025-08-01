@@ -52,58 +52,58 @@ class SocketHandler {
 
         // Room management events - delegate to GameManager
         this.socket.on('room_created', this.registerHandler('room_created', (data) => {
-            gameManager.handleRoomCreated(data);
+            if (window.gameManager) window.gameManager.handleRoomCreated(data);
         }));
 
         this.socket.on('joined_room', this.registerHandler('joined_room', (data) => {
-            gameManager.handleJoinedRoom(data);
+            if (window.gameManager) window.gameManager.handleJoinedRoom(data);
         }));
 
         this.socket.on('join_room_error', this.registerHandler('join_room_error', (data) => {
-            gameManager.handleJoinRoomError(data);
+            if (window.gameManager) window.gameManager.handleJoinRoomError(data);
         }));
 
         this.socket.on('room_list_updated', this.registerHandler('room_list_updated', (data) => {
-            gameManager.updateRoomList(data.rooms);
+            if (window.gameManager) window.gameManager.updateRoomList(data.rooms);
         }));
 
         // Player management events - delegate to GameManager
         this.socket.on('players_updated', this.registerHandler('players_updated', (data) => {
-            gameManager.handlePlayersUpdated(data);
+            if (window.gameManager) window.gameManager.handlePlayersUpdated(data);
         }));
 
         // Game flow events - delegate to GameManager
-        this.socket.on('countdown_started', this.registerHandler('countdown_started', (data) => {
-            gameManager.handleCountdownStarted(data);
+        this.socket.on('joining_countdown_started', this.registerHandler('joining_countdown_started', (data) => {
+            if (window.gameManager) window.gameManager.handleCountdownStarted(data);
         }));
 
         this.socket.on('countdown_cancelled', this.registerHandler('countdown_cancelled', (data) => {
-            gameManager.handleCountdownCancelled(data);
+            if (window.gameManager) window.gameManager.handleCountdownCancelled(data);
         }));
 
         this.socket.on('game_started', this.registerHandler('game_started', (data) => {
-            gameManager.handleGameStarted(data);
+            if (window.gameManager) window.gameManager.handleGameStarted(data);
         }));
 
         this.socket.on('phase_changed', this.registerHandler('phase_changed', (data) => {
-            gameManager.handlePhaseChanged(data);
+            if (window.gameManager) window.gameManager.handlePhaseChanged(data);
         }));
 
         // Drawing and copying events - delegate to GameManager
         this.socket.on('copying_assignment', this.registerHandler('copying_assignment', (data) => {
-            gameManager.handleCopyingAssignment(data);
+            if (window.gameManager) window.gameManager.handleCopyingAssignment(data);
         }));
 
         this.socket.on('copying_viewing_phase', this.registerHandler('copying_viewing_phase', (data) => {
-            gameManager.handleCopyingViewingPhase(data);
+            if (window.gameManager) window.gameManager.handleCopyingViewingPhase(data);
         }));
 
         this.socket.on('copying_phase_started', this.registerHandler('copying_phase_started', (data) => {
-            gameManager.handleCopyingPhaseStarted(data);
+            if (window.gameManager) window.gameManager.handleCopyingPhaseStarted(data);
         }));
 
         // Submission acknowledgments - delegate to UIManager
-        this.socket.on('drawing_submitted', this.registerHandler('drawing_submitted', (data) => {
+        this.socket.on('original_submitted', this.registerHandler('original_submitted', (data) => {
             uiManager.showMessage('Drawing submitted successfully!', 'success');
         }));
 
@@ -113,16 +113,16 @@ class SocketHandler {
 
         // Voting events - delegate to GameManager
         this.socket.on('voting_round', this.registerHandler('voting_round', (data) => {
-            gameManager.handleVotingRound(data);
+            if (window.gameManager) window.gameManager.handleVotingRound(data);
         }));
 
         this.socket.on('voting_round_excluded', this.registerHandler('voting_round_excluded', (data) => {
-            gameManager.handleVotingRoundExcluded(data);
+            if (window.gameManager) window.gameManager.handleVotingRoundExcluded(data);
         }));
 
         // Game results - delegate to GameManager
         this.socket.on('game_results', this.registerHandler('game_results', (data) => {
-            gameManager.handleGameResults(data);
+            if (window.gameManager) window.gameManager.handleGameResults(data);
         }));
 
         // Review functionality - delegate to UIManager
@@ -145,11 +145,11 @@ class SocketHandler {
         }));
 
         this.socket.on('game_ended_early', this.registerHandler('game_ended_early', (data) => {
-            gameManager.handleGameEndedEarly(data);
+            if (window.gameManager) window.gameManager.handleGameEndedEarly(data);
         }));
 
         this.socket.on('room_left', this.registerHandler('room_left', (data) => {
-            gameManager.handleRoomLeft(data);
+            if (window.gameManager) window.gameManager.handleRoomLeft(data);
         }));
 
         // Error handling

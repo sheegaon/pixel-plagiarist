@@ -1,12 +1,10 @@
 // Results management for Pixel Plagiarist
 class ResultsManager {
     constructor() {
-        this.gameResults = null;
         this.finalStandings = [];
     }
 
     displayResults(data) {
-        this.gameResults = data;
         this.processStandings(data);
         
         uiManager.showView('results');
@@ -22,8 +20,7 @@ class ResultsManager {
             .map(([pid, tokens]) => ({
                 id: pid,
                 name: data.player_names[pid] || `Player ${pid}`,
-                tokens: tokens,
-                score: data.final_scores[pid] || 0
+                tokens: Math.round(tokens * 100) / 100  // Round to nearest cent
             }))
             .sort((a, b) => b.tokens - a.tokens);
     }
@@ -40,19 +37,11 @@ class ResultsManager {
         standingsDiv.innerHTML = this.generateStandingsHTML();
         grid.appendChild(standingsDiv);
         
-        // Add detailed results if available
-        if (this.gameResults.round_results) {
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'result-item details';
-            detailsDiv.innerHTML = this.generateDetailsHTML();
-            grid.appendChild(detailsDiv);
-        }
-        
         // Add return home button
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'result-actions';
         actionsDiv.innerHTML = `
-            <button class="primary-btn" onclick="gameManager.returnHome()">
+            <button class="primary-btn" onclick="window.gameManager.returnHome()">
                 🏠 Return Home
             </button>
         `;
@@ -91,58 +80,6 @@ class ResultsManager {
         
         html += '</div>';
         return html;
-    }
-
-    generateDetailsHTML() {
-        if (!this.gameResults.round_results) return '';
-        
-        let html = `
-            <h4>🎯 Round Details</h4>
-            <div class="round-details">
-        `;
-        
-        this.gameResults.round_results.forEach((round, index) => {
-            html += `
-                <div class="round-summary">
-                    <h5>Round ${index + 1}</h5>
-                    <p><strong>Prompt:</strong> "${round.prompt}"</p>
-                    <p><strong>Correct Votes:</strong> ${round.correct_votes}/${round.total_votes}</p>
-                    <p><strong>Accuracy:</strong> ${Math.round((round.correct_votes / round.total_votes) * 100)}%</p>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        return html;
-    }
-
-    getWinner() {
-        return this.finalStandings.length > 0 ? this.finalStandings[0] : null;
-    }
-
-    getPlayerRank(playerId) {
-        const index = this.finalStandings.findIndex(p => p.id === playerId);
-        return index >= 0 ? index + 1 : null;
-    }
-
-    getPlayerScore(playerId) {
-        const player = this.finalStandings.find(p => p.id === playerId);
-        return player ? player.score : 0;
-    }
-
-    getPlayerTokens(playerId) {
-        const player = this.finalStandings.find(p => p.id === playerId);
-        return player ? player.tokens : 0;
-    }
-
-    exportResults() {
-        if (!this.gameResults) return null;
-        
-        return {
-            timestamp: new Date().toISOString(),
-            standings: this.finalStandings,
-            gameData: this.gameResults
-        };
     }
 
     reset() {

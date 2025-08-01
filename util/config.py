@@ -1,16 +1,19 @@
 # Configuration and constants for Pixel Plagiarist server
 import os
 import csv
+import json
+
+# Get the absolute path of the config.json file
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+
+with open(config_path) as f:
+    CONFIG = json.load(f)
 
 # Game Constants
-CONSTANTS = {
-    'initial_balance': 100,
-    'max_players': 12,
-    'blank_image_penalty': 0.05,
-    'non_voting_penalty': 0.02,
+CONSTANTS = {**CONFIG, **{
     'debug_mode': os.environ.get('DEBUG_MODE', 'true').lower() == 'true',
     'testing_mode': os.environ.get('TESTING_MODE', 'false').lower() == 'true'
-}
+}}
 
 
 def get_timer_config():
@@ -25,28 +28,31 @@ def get_timer_config():
     -------
     dict
         Dictionary containing timer values:
-        - countdown: Time to wait for more players before starting
+        - joining: Time to wait for more players to join before starting
         - betting: Time allowed for placing bets
         - drawing: Time allowed for drawing original artwork
         - copying: Time allowed for copying other players' drawings
         - voting: Time allowed per voting round
+        - review: Time allowed for reviewing original drawings
     """
     if CONSTANTS['testing_mode']:
-        print("🧪 TESTING MODE ENABLED - All timers set to 5 seconds")
+        print("🧪 TESTING MODE ENABLED - All timers set to 2 seconds")
         return {
-            'countdown': 5,
-            'betting': 5,
-            'drawing': 5,
-            'copying': 5,
-            'voting': 5
+            'joining': 2,
+            'betting': 2,
+            'drawing': 2,
+            'copying': 2,
+            'voting': 2,
+            'review': 2,
         }
 
     return {
-        'countdown': int(os.environ.get('COUNTDOWN_TIMER', 20)),
-        'betting': int(os.environ.get('BETTING_TIMER', 10)),
-        'drawing': int(os.environ.get('DRAWING_TIMER', 60)),
-        'copying': int(os.environ.get('COPYING_TIMER', 60)),
-        'voting': int(os.environ.get('VOTING_TIMER', 30))
+        'joining': CONFIG['JOINING_TIMER'],
+        'betting': CONFIG['BETTING_TIMER'],
+        'drawing': CONFIG['DRAWING_TIMER'],
+        'copying': CONFIG['COPYING_TIMER'],
+        'voting': CONFIG['VOTING_TIMER'],
+        'review': CONFIG['REVIEW_TIMER'],
     }
 
 

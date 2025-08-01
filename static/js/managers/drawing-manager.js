@@ -1,4 +1,4 @@
-// Drawing phase management for Pixel Plagiarist
+// Original drawing phase management for Pixel Plagiarist
 class DrawingManager {
     constructor() {
         this.currentPrompt = '';
@@ -35,6 +35,12 @@ class DrawingManager {
     }
 
     submitDrawing() {
+        // Validate phase before submission
+        if (gameStateManager.getPhase() !== GameConfig.PHASES.DRAWING) {
+            uiManager.showError('Cannot submit drawing during this phase');
+            return;
+        }
+
         if (this.drawingSubmitted) {
             uiManager.showError('Drawing already submitted');
             return;
@@ -57,10 +63,7 @@ class DrawingManager {
             submitButton.textContent = 'Submitted';
         }
 
-        socketHandler.emit('submit_drawing', {
-            drawing_data: drawingData,
-            type: 'original'
-        });
+        socketHandler.emit('submit_original', {drawing_data: drawingData});
 
         this.drawingSubmitted = true;
         uiManager.showSuccess('Drawing submitted successfully!');

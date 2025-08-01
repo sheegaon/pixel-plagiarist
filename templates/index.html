@@ -17,7 +17,7 @@
                 🎨 Pixel Plagiarist
             </h1>
             <div class="game-info">
-                <div class="info-item" id="balanceInfo">Balance: $100</div>
+                <div class="info-item" id="balanceInfo">Balance: -</div>
                 <div class="info-item hidden" id="roomInfo">Room: -</div>
                 
                 {% if user %}
@@ -46,15 +46,15 @@
                         <div id="roomList" class="room-list">
                             <div class="no-rooms">No active rooms. Create one to get started!</div>
                         </div>
-                        <button onclick="gameManager.refreshRoomList()" class="refresh-btn">🔄 Refresh</button>
+                        <button onclick="window.gameManager.refreshRoomList()" class="refresh-btn">🔄 Refresh</button>
                     </div>
 
                     <div class="room-section">
                         <h3>Create Room</h3>
                         <div class="stake-buttons">
-                            <button onclick="gameManager.createRoomWithStake(10)" class="stake-btn">Create $10 Minimum Room</button>
-                            <button onclick="gameManager.createRoomWithStake(25)" class="stake-btn">Create $25 Minimum Room</button>
-                            <button onclick="gameManager.createRoomWithStake(100)" class="stake-btn">Create $100 Minimum Room</button>
+                            <button onclick="window.gameManager.createRoomWithStake(10)" class="stake-btn">Create $10 Minimum Room</button>
+                            <button onclick="window.gameManager.createRoomWithStake(25)" class="stake-btn">Create $25 Minimum Room</button>
+                            <button onclick="window.gameManager.createRoomWithStake(100)" class="stake-btn">Create $100 Minimum Room</button>
                         </div>
                     </div>
                 </div>
@@ -70,11 +70,11 @@
                 </div>
                 <div class="player-list" id="playerList"></div>
                 <div id="countdownDisplay" style="display: none;">
-                    <div class="timer" id="countdownTimer">20</div>
+                    <div class="timer" id="joiningTimer"></div>
                     <p>Game starting soon!</p>
                 </div>
                 <div class="waiting-actions">
-                    <button onclick="gameManager.leaveRoom()" class="leave-room-btn">🚪 Leave Room</button>
+                    <button onclick="window.gameManager.leaveRoom()" class="leave-room-btn">🚪 Leave Room</button>
                 </div>
             </div>
 
@@ -97,13 +97,13 @@
                     </div>
                 </div>
                 
-                <button onclick="gameManager.placeBet()" id="betButton">Place Bet</button>
-                <div class="timer" id="bettingTimer">10</div>
+                <button onclick="window.gameManager.placeBet()" id="betButton">Place Bet</button>
+                <div class="timer" id="bettingTimer"></div>
             </div>
 
-            <!-- Drawing Screen -->
+            <!-- Original Drawing Screen -->
             <div class="screen" id="drawingScreen">
-                <div class="phase-indicator">Drawing Phase</div>
+                <div class="phase-indicator">Original Drawing Phase</div>
                 <div id="drawingPromptDisplay" class="result-item">
                     <h3>Draw:</h3>
                     <p id="drawingPromptText"></p>
@@ -118,7 +118,7 @@
                 </div>
 
                 <button onclick="drawingCanvas.submitDrawing('original')" id="submitDrawingBtn">Submit Drawing</button>
-                <div class="timer" id="drawingTimer">60</div>
+                <div class="timer" id="drawingTimer"></div>
             </div>
 
             <!-- Copying Screen -->
@@ -139,8 +139,8 @@
                     <canvas id="copyingCanvas" width="400" height="300"></canvas>
                 </div>
 
-                <button onclick="gameManager.submitCurrentCopy()" id="submitCopyBtn" disabled>Submit Copy</button>
-                <div class="timer" id="copyingTimer">60</div>
+                <button onclick="window.gameManager.submitCurrentCopy()" id="submitCopyBtn" disabled>Submit Copy</button>
+                <div class="timer" id="copyingTimer"></div>
             </div>
 
             <!-- Voting Screen -->
@@ -153,8 +153,8 @@
 
                 <div class="voting-grid" id="votingGrid"></div>
                 
-                <button onclick="gameManager.submitVote()" id="submitVoteBtn" disabled>Submit Vote</button>
-                <div class="timer" id="votingTimer">10</div>
+                <button onclick="window.gameManager.submitVote()" id="submitVoteBtn" disabled>Submit Vote</button>
+                <div class="timer" id="votingTimer"></div>
             </div>
 
             <!-- Results Screen -->
@@ -192,7 +192,7 @@
                 <label for="roomCodeInputModal">Room Code:</label>
                 <input type="text" id="roomCodeInputModal" placeholder="Enter room code">
             </div>
-            <button onclick="gameManager.joinRoomByCode()">Join Room</button>
+            <button onclick="window.gameManager.joinRoomByCode()">Join Room</button>
             <div id="modalErrorDisplay" class="error-message" style="display: none;"></div>
         </div>
     </div>
@@ -209,15 +209,15 @@
     <script src="{{ url_for('static', filename='js/config.js') }}"></script>
     
     <!-- Load specialized managers first -->
-    <script src="{{ url_for('static', filename='js/managers/room-manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/managers/player-manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/managers/game-state-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/managers/betting-manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/managers/drawing-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/managers/copying-manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/managers/voting-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/game-state-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/drawing-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/player-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/managers/results-manager.js') }}"></script>
-    
+    <script src="{{ url_for('static', filename='js/managers/room-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/managers/voting-manager.js') }}"></script>
+
     <!-- Load core modules -->
     <script src="{{ url_for('static', filename='js/drawing-canvas.js') }}"></script>
     <script src="{{ url_for('static', filename='js/socket-handler.js') }}"></script>

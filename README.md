@@ -1,6 +1,6 @@
 # Pixel Plagiarist
 
-A multiplayer web-based drawing game where players create original artwork, copy each other's drawings, and vote to identify the originals. Built with Flask, Socket.IO, and HTML5 Canvas.
+A multiplayer web-based drawing game where players create original artwork, copy each other's drawings, and vote to identify the originals.
 
 ## Game Overview
 
@@ -19,32 +19,31 @@ A multiplayer web-based drawing game where players create original artwork, copy
 
 ### Game Phases
 
-**Pixel Plagiarist** follows a structured 6-phase gameplay cycle designed to balance creativity, strategy, and deduction:
+**Pixel Plagiarist** follows a structured 6-phase gameplay cycle:
 
 #### 1. Room Setup & Betting Phase
 - Players join rooms with configurable minimum stakes ($10, $25, or $100)
-- Each player receives a starting balance of $100.
+- Each player receives a starting balance of $100
 - Players must wager at least the room's minimum stake to participate
 - Stakes are collected into a prize pool distributed based on performance
 
-#### 2. Drawing Phase (60 seconds)
+#### 2. Original Drawing Phase
 - Each player receives a unique drawing prompt (e.g., "Cat wearing a hat", "Flying book")
 - Players create original artwork using HTML5 canvas tools (brush, eraser)
 - Drawings are submitted privately - other players cannot see them yet
 - Auto-submission occurs if time expires to prevent game stalls
 
-#### 3. Copying Assignment & Viewing Phase (10 seconds)
+#### 3. Copying Assignment & Viewing Phase
 - System randomly assigns each player 1-2 other players' drawings to copy
 - Players are shown their assigned drawings for a brief viewing period
-- This creates the core deception mechanic - copies mixed with originals
 
-#### 4. Copying Phase (60 seconds per drawing)
+#### 4. Copying Phase
 - Players recreate their assigned drawings from memory
 - "View Again" button allows 5-second re-examination of original
 - Goal: Make copies so accurate they're indistinguishable from originals
 - Multiple copying rounds if assigned multiple targets
 
-#### 5. Voting Phase (30 seconds per set)
+#### 5. Voting Phase
 - Drawings are grouped into sets mixing originals with copies
 - Players vote to identify which drawing in each set is the original
 - **Voting Exclusions**: Players cannot vote on sets containing their own work
@@ -60,29 +59,17 @@ A multiplayer web-based drawing game where players create original artwork, copy
 The scoring system rewards both artistic deception and detective skills:
 
 #### **Deception Points** (Being a Successful Plagiarist)
+- **+100 points** for each vote your original drawing receives
 - **+150 points** for each vote your copy receives (others think it's original)
-- **+100 point** for each vote your original drawing receives
 
 #### **Detection Points** (Being a Good Detective)
 - **+25 points** for correctly identifying an original drawing
 
 #### **Token Distribution**
-- The prize pool (sum of all stakes) is distributed independently for each prompt to each player in proportion to their scores
-- Prize pool is taken equally from the stakes of all players who drew in the round
+- The prize pool (sum of all stakes) is distributed proportionally based on scores
+- Prize pool contributions are taken equally from all participating artists in the set
 - Excess stakes are returned to players
-- Disconnected or inactive players partially forfeit their stakes, which are redistributed to active players 
-
-### Voting Mechanics
-
-#### **Smart Voting Sets**
-- System creates balanced sets mixing 1 original with 2 copies
-- Each player's work appears in multiple voting sets for fair evaluation
-- Sets are distributed so each player votes on an equal number of drawings
-
-#### **Voting Exclusions**
-Players are automatically excluded from voting on sets where:
-- Their original drawing is included
-- Their copy is included
+- Disconnected or inactive players forfeit a portion of their excess stakes, which are redistributed to active players
 
 #### **Strategic Considerations**
 - **Copy Quality**: Better copies fool more voters but are harder to create
@@ -90,16 +77,15 @@ Players are automatically excluded from voting on sets where:
 - **Voting Psychology**: Consider what other players might find believable
 - **Risk Management**: Balance copying accuracy with time management
 
-### Advanced Features
+## Additional Features
 
 #### **Content Moderation**
 - Players can flag inappropriate drawings during any game phase
 - Flagged content is logged with reporter and creator information
-- Built-in review system for maintaining game quality
+- Review system for maintaining game quality
 
-#### **Adaptive Timers**
+#### **Configurable Timers**
 - Timers can be configured for different game speeds
-- Testing mode reduces all timers to 5 seconds for rapid iteration
 - Auto-submission prevents indefinite game stalls
 
 #### **Room Management**
@@ -124,9 +110,9 @@ Players are automatically excluded from voting on sets where:
 - Consider which drawing shows more confidence in execution
 - Remember that copies often lack the spontaneity of originals
 
-## Features
+## Core Features
 
-### Core Gameplay
+### Gameplay
 - **Real-time multiplayer**: Up to 12 players per room
 - **Dynamic prompts**: Varied drawing challenges from curated prompt list
 - **Betting system**: Token-based wagering adds strategic depth
@@ -156,10 +142,6 @@ Players are automatically excluded from voting on sets where:
 
 ## Installation & Setup
 
-### Prerequisites
-- Python 3.8+
-- pip package manager
-
 ### Local Development
 ```bash
 # Clone the repository
@@ -178,3 +160,46 @@ The game will be available at `http://localhost:5000`
 ### Environment Variables
 - `PORT`: Server port (default: 5000)
 - `FLASK_ENV`: Set to 'development' for debug mode
+- `TESTING_MODE`: Set to 'true' to enable accelerated timers for testing
+- `DEBUG_MODE`: Set to 'true' to enable detailed logging
+
+### Deployment
+
+The application is configured for Heroku deployment with the included `Procfile` and `runtime.txt`. For other platforms, ensure the WSGI server is properly configured.
+
+## Development
+
+### Testing Mode
+Enable testing mode with accelerated timers:
+```bash
+TESTING_MODE=true python server.py
+```
+
+This reduces all game phase timers to 5 seconds for rapid testing and development.
+
+### AI Players
+The included `ai_player.py` script can be used to add automated players for testing:
+```bash
+python ai_player.py --count 3
+```
+
+### Game Configuration
+Modify `util/config.json` to adjust:
+- Timer durations for each phase
+- Min/max number of players per room
+- Betting stakes and token distribution rules
+
+## Project Structure
+```
+pixel_plagiarist/
+├── server.py              # Main Flask application
+├── ai_player.py           # AI player for testing
+├── game_logic/            # Core game logic modules
+├── socket_handlers/       # WebSocket event handlers
+├── static/                # Frontend assets
+│   ├── js/                # JavaScript modules
+│   ├── css/               # Stylesheets
+│   └── images/            # Game assets
+├── templates/             # HTML templates for rendering
+└── util/                  # Utility functions and configuration
+```

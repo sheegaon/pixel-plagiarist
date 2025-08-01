@@ -9,13 +9,13 @@ from .connection_handlers import ConnectionHandlers
 from .room_handlers import RoomHandlers
 from .game_handlers import GameHandlers
 from .admin_handlers import AdminHandlers
-from .game_state import GameState, get_room_info, broadcast_room_list, game_state
+from .game_state import GameStateSH, get_room_info, broadcast_room_list, game_state_sh
 
 
 # Create convenience function for backward compatibility
 def check_and_create_default_room(socketio=None):
     """Backward compatibility wrapper for game_state.check_and_create_default_room"""
-    return game_state.check_and_create_default_room(socketio)
+    return game_state_sh.check_and_create_default_room(socketio)
 
 
 __all__ = [
@@ -24,7 +24,7 @@ __all__ = [
     'RoomHandlers',
     'GameHandlers',
     'AdminHandlers',
-    'GameState',
+    'GameStateSH',
     'get_room_info',
     'broadcast_room_list',
     'check_and_create_default_room'

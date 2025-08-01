@@ -1,7 +1,7 @@
 # Pixel Plagiarist Visual Customization Guide
 
 ## Overview
-Your game has a simple asset management system that looks great by default and makes it easy to replace individual visual elements as you create custom graphics. The system gracefully falls back to the default styling when custom images aren't available.
+The game includes an asset management system that provides attractive default styling and allows easy replacement of individual visual elements with custom graphics. The system gracefully falls back to default styling when custom images aren't available.
 
 ## Directory Structure
 ```
@@ -22,12 +22,12 @@ static/
 │   │   ├── canvas-border.png        # Drawing canvas border image
 │   │   └── button-bg.png            # Custom button backgrounds
 │   └── themes/
-│       └── [future theme folders]
+│       └── [theme folders for future expansion]
 ```
 
-## What Gets Applied Automatically
+## Default Styling
 
-### Default Styling (No Custom Images Needed)
+### Visual Design Elements
 - **Animated gradient background** with smooth color transitions
 - **Glass-morphism UI elements** with blur effects and transparency
 - **Styled buttons** with gradients, shadows, and hover animations
@@ -36,13 +36,13 @@ static/
 - **Smooth transitions** and micro-animations throughout
 
 ### Custom Image Integration
-When you add images to the appropriate folders, they automatically replace the default elements:
+When images are added to the appropriate folders, they automatically replace the default elements:
 
-## Easy Customization Steps
+## Customization Steps
 
 ### 1. Replace Background
 - Add `game-background.jpg` to `/static/images/`
-- Supports: JPG, PNG, WebP
+- Supports: JPG, PNG, WebP formats
 - Recommended: High resolution, landscape orientation
 - The animated gradient remains as fallback
 
@@ -52,7 +52,7 @@ When you add images to the appropriate folders, they automatically replace the d
 - Appears next to the game title
 - Title text remains for branding
 
-### 3. Replace Icons One by One
+### 3. Replace Icons
 Add any of these to `/static/images/icons/`:
 - `exit-icon.png` - Leave room button
 - `trophy-icon.png` - Leaderboard button  
@@ -64,7 +64,7 @@ Add any of these to `/static/images/icons/`:
 
 Icons automatically replace emojis when available, with smooth transitions.
 
-### 4. Advanced UI Customization
+### 4. UI Element Customization
 Add to `/static/images/ui/`:
 - `timer-bg.png` - Background decoration for countdown timers
 - `canvas-border.png` - Custom border around drawing canvases
@@ -72,7 +72,7 @@ Add to `/static/images/ui/`:
 
 ## Development Console Commands
 
-For testing and development, you can replace assets at runtime:
+For testing and development, assets can be replaced at runtime:
 
 ```javascript
 // Replace an icon
@@ -88,40 +88,40 @@ console.log(assetManager.assets);
 ## Image Specifications
 
 ### Backgrounds
-- **Main background**: 1920x1080+ recommended
-- **UI backgrounds**: 200x100+ depending on element
-- Formats: JPG (smaller file), PNG (transparency), WebP
+- **Main background**: 1920x1080+ recommended for full coverage
+- **UI backgrounds**: 200x100+ depending on element size
+- **Formats**: JPG (smaller file size), PNG (transparency support), WebP (modern browsers)
 
 ### Icons
-- **Size**: 20x20px to 64x64px (they scale automatically)
-- **Format**: PNG recommended for transparency
+- **Size**: 20x20px to 64x64px (auto-scaling applied)
+- **Format**: PNG recommended for transparency support
 - **Style**: Should work on both light and dark backgrounds
 
 ### Logos
-- **Height**: 48px recommended (width auto-scales)
+- **Height**: 48px recommended (width scales proportionally)
 - **Format**: PNG for transparency, SVG for crisp scaling
 - **Style**: Should complement the gradient title text
 
-## Current Visual Design
+## Current Visual Theme
 
-### Color Scheme
+### Color Palette
 - **Primary**: Blue gradients (#4299e1 to #3182ce)
 - **Success**: Green gradients (#48bb78 to #38a169)  
 - **Warning/Timer**: Red gradients (#e53e3e variants)
 - **Background**: Purple-pink gradient animation
 
-### Effects
-- **Glass morphism**: Translucent panels with blur
+### Visual Effects
+- **Glass morphism**: Translucent panels with backdrop blur
 - **Smooth animations**: 0.3s transitions on hover/interaction
-- **Gradient borders**: Canvas and elements have gradient borders
-- **Pulsing timer**: Subtle scale animation for urgency
-- **Hover effects**: Lift and glow on interactive elements
+- **Gradient borders**: Canvas and UI elements feature gradient borders
+- **Pulsing timer**: Subtle scale animation for urgency indication
+- **Hover effects**: Lift and glow effects on interactive elements
 
-## Next Steps
+## Implementation Approach
 
-1. **Start with background**: Add a custom `game-background.jpg` for immediate impact
-2. **Add logo**: Create a `game-logo.png` for brand recognition
-3. **Replace icons gradually**: Add icons one by one as you create them
-4. **Customize specific elements**: Use the UI folder for advanced customizations
+1. **Start with background**: Add a custom `game-background.jpg` for immediate visual impact
+2. **Add branding**: Create a `game-logo.png` for brand recognition
+3. **Replace icons incrementally**: Add icons one by one as they're created
+4. **Customize specific elements**: Use the UI folder for detailed customizations
 
-The system is designed to let you customize the game's appearance incrementally without breaking anything. Each addition makes the game more visually unique while maintaining the polished default appearance.
+The system is designed to allow incremental visual customization without breaking functionality. Each addition enhances the game's visual uniqueness while maintaining the polished default appearance for uncustomized elements.

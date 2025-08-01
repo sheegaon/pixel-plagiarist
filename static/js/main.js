@@ -6,10 +6,13 @@ class PixelPlagiarist {
         this.eventListeners = [];
     }
 
-    init() {
+    async init() {
         if (this.initialized) return;
         
         try {
+            // Load configuration first before initializing modules
+            await this.loadConfiguration();
+            
             this.initializeModules();
             this.setupEventListeners();
             this.setupInitialState();
@@ -24,7 +27,59 @@ class PixelPlagiarist {
         }
     }
 
+    async loadConfiguration() {
+        // Try multiple possible paths for the config file
+        const configPaths = [
+            '/util/config.json',
+            '/static/util/config.json',
+            '/static/js/util/config.json'
+        ];
+        
+        for (const path of configPaths) {
+            try {
+                const response = await fetch(path);
+                if (response.ok) {
+                    const configData = await response.json();
+                    
+                    // Update GameConfig with values from JSON
+                    Object.keys(configData).forEach(key => {
+                        if (GameConfig.hasOwnProperty(key)) {
+                            GameConfig[key] = configData[key];
+                            debug(`Updated ${key}: ${configData[key]}`);
+                        }
+                    });
+                    
+                    // Also update the TIMERS object for convenience
+                    const newTimers = {
+                        JOINING: configData.JOINING_TIMER || GameConfig.TIMERS.JOINING,
+                        BETTING: configData.BETTING_TIMER || GameConfig.TIMERS.BETTING,
+                        DRAWING: configData.DRAWING_TIMER || GameConfig.TIMERS.DRAWING,
+                        COPYING: configData.COPYING_TIMER || GameConfig.TIMERS.COPYING,
+                        VOTING: configData.VOTING_TIMER || GameConfig.TIMERS.VOTING,
+                        REVIEW: configData.REVIEW_TIMER || GameConfig.TIMERS.REVIEW
+                    };
+                    
+                    // Replace the TIMERS object instead of reassigning
+                    Object.keys(newTimers).forEach(key => {
+                        GameConfig.TIMERS[key] = newTimers[key];
+                    });
+                    
+                    debug(`Configuration loaded successfully from ${path}`);
+                    return;
+                }
+            } catch (error) {
+                debug(`Failed to load config from ${path}: ${error.message}`);
+            }
+        }
+        
+        console.warn('Could not load configuration from any path. Using default values.');
+    }
+
     initializeModules() {
+        // Create gameManager first, then initialize its managers
+        window.gameManager = new GameManager();
+        window.gameManager.initializeManagers();
+        
         const initOrder = [
             { name: 'socketHandler', instance: socketHandler, init: () => socketHandler.init() },
             { name: 'drawingCanvas', instance: drawingCanvas, init: () => drawingCanvas.init() },
@@ -32,10 +87,10 @@ class PixelPlagiarist {
                 uiManager.initResponsive();
                 uiManager.setupKeyboardNavigation();
             }},
-            { name: 'gameManager', instance: gameManager, init: () => {
-                // Game manager initializes all sub-managers in its constructor
+            { name: 'gameManager', instance: window.gameManager, init: () => {
+                // Game manager and its sub-managers are now properly initialized
                 // Just need to set up any initial UI state
-                gameManager.updateBalanceDisplay();
+                window.gameManager.updateBalanceDisplay();
             }}
         ];
 
@@ -113,8 +168,12 @@ class PixelPlagiarist {
     }
 
     setupInitialState() {
-        if (gameManager.updateBalanceDisplay) {
-            gameManager.updateBalanceDisplay();
+        // Ensure balance display is updated after all managers are initialized
+        if (window.gameManager && window.gameManager.updateBalanceDisplay) {
+            setTimeout(() => {
+                window.gameManager.updateBalanceDisplay();
+                debug(`Initial balance set to: $${GameConfig.INITIAL_BALANCE}`);
+            }, 10);
         }
         
         const stakeSlider = document.getElementById('stakeSlider');

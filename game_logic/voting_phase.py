@@ -1,11 +1,15 @@
 # Voting phase logic for Pixel Plagiarist
 import random
-from logging_utils import debug_log
+from util.logging_utils import debug_log
 
 # Create a simple 400x300 white canvas as base64 PNG
 BLANK_CANVAS = (
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAYAAADtt+XCAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAA"
     "AHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVHic7cExAQAAAMKg9U9tCj+gAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -30,17 +34,27 @@ class VotingPhase:
             Reference to the main game instance
         """
         self.game = game
+        self.drawing_sets_created = False  # Prevent duplicate set creation
+        self.current_set_started = False  # Prevent duplicate set starts
+        self.set_start_time = None  # Track when the current set started
 
     def start_phase(self, socketio):
         """Start the voting phase"""
+        # Prevent duplicate phase starts
+        if self.game.phase == "voting" and self.drawing_sets_created:
+            debug_log("Voting phase already started, skipping duplicate call", None, self.game.room_id)
+            return
+            
         debug_log("Starting voting phase", None, self.game.room_id,
                   {'drawing_sets_to_create': len(self.game.original_drawings)})
 
         self.game.phase = "voting"
         self.game.idx_current_drawing_set = 0
 
-        # Create voting sets (original + copies for each original)
-        self._create_voting_sets()
+        # Create voting sets (original + copies for each original) - only once
+        if not self.drawing_sets_created:
+            self._create_drawing_sets()
+            self.drawing_sets_created = True
 
         debug_log("Voting phase setup complete", None, self.game.room_id,
                   {'total_drawing_sets': len(self.game.drawing_sets)})
@@ -48,8 +62,8 @@ class VotingPhase:
         # Start voting on first set
         self.start_voting_on_set(socketio)
 
-    def _create_voting_sets(self):
-        """Create voting sets with originals and copies"""
+    def _create_drawing_sets(self):
+        """Create drawing sets with originals and copies"""
         self.game.drawing_sets = []
 
         for original_player_id in self.game.original_drawings:
@@ -109,6 +123,13 @@ class VotingPhase:
 
     def start_voting_on_set(self, socketio):
         """Start voting on current set using configured timer"""
+        # Prevent duplicate set starts
+        if self.current_set_started:
+            debug_log("Current voting set already started, skipping duplicate call", None, self.game.room_id, {
+                'set_index': self.game.idx_current_drawing_set
+            })
+            return
+            
         debug_log("Starting voting on set", None, self.game.room_id, {
             'set_index': self.game.idx_current_drawing_set,
             'total_sets': len(self.game.drawing_sets)
@@ -116,22 +137,25 @@ class VotingPhase:
 
         if self.game.idx_current_drawing_set >= len(self.game.drawing_sets):
             debug_log("All voting sets completed - calculating results", None, self.game.room_id)
-            self.game.calculate_results(socketio)
+            self.game.scoring_engine.calculate_results(socketio)
             return
 
+        self.current_set_started = True
+        # Reset the timer for this new voting set
+        import time
+        self.set_start_time = time.time()
+        
         current_set = self.game.drawing_sets[self.game.idx_current_drawing_set]
         original_player_id = current_set['original_id']
         original_prompt = self.game.player_prompts.get(original_player_id, "Unknown prompt")
 
-        # Determine who can vote on this set
-        excluded_players = set()
-        for drawing in current_set['drawings']:
-            excluded_players.add(drawing['player_id'])
+        # Prepare shuffled drawings for all players
+        shuffled_drawings = current_set['drawings'].copy()
+        random.shuffle(shuffled_drawings)
 
-        eligible_voters = [pid for pid in self.game.players if pid not in excluded_players]
+        eligible_voters = self.get_eligible_voters_for_set(current_set)
 
         debug_log("Voting eligibility determined", None, self.game.room_id, {
-            'excluded_players': len(excluded_players),
             'eligible_voters': len(eligible_voters),
             'drawings_in_set': len(current_set['drawings']),
             'original_prompt': original_prompt
@@ -139,11 +163,8 @@ class VotingPhase:
 
         # Send voting data to eligible players
         for player_id in self.game.players:
-            if player_id not in excluded_players:
+            if player_id in eligible_voters:
                 # Randomize order for each player to prevent collusion
-                shuffled_drawings = current_set['drawings'].copy()
-                random.shuffle(shuffled_drawings)
-
                 debug_log("Sending voting round to eligible player", player_id, self.game.room_id, {
                     'set_index': self.game.idx_current_drawing_set,
                     'drawings_count': len(shuffled_drawings)
@@ -154,7 +175,7 @@ class VotingPhase:
                     'total_sets': len(self.game.drawing_sets),
                     'drawings': shuffled_drawings,
                     'prompt': original_prompt,  # Add the original prompt
-                    'timer': self.game.timer.get_voting_timer()
+                    'timer': self.game.timer.get_voting_timer_duration()
                 }, to=player_id)
             else:
                 debug_log("Player excluded from voting round", player_id, self.game.room_id, {
@@ -169,16 +190,24 @@ class VotingPhase:
                     'reason': 'You drew or copied in this set',
                     'drawings': shuffled_drawings,  # Add drawings for observation
                     'prompt': original_prompt,  # Add the original prompt
-                    'timer': self.game.timer.get_voting_timer()
+                    'timer': self.game.timer.get_voting_timer_duration()
                 }, to=player_id)
 
         self.game.timer.start_phase_timer(
             socketio,
-            self.game.timer.get_voting_timer(),
+            self.game.timer.get_voting_timer_duration(),
             lambda: self.next_voting_set(socketio)
         )
 
-    def submit_vote(self, player_id, drawing_id, socketio):
+    def get_eligible_voters_for_set(self, drawing_set):
+        # Determine who can vote on this set
+        excluded_players = set()
+        for drawing in drawing_set['drawings']:
+            excluded_players.add(drawing['player_id'])
+
+        return [pid for pid in self.game.players if pid not in excluded_players]
+
+    def submit_vote(self, player_id, drawing_id, socketio, check_early_advance=True):
         """Record a player's vote for which drawing they think is original."""
         debug_log("Player submitting vote", player_id, self.game.room_id, {
             'drawing_id': drawing_id,
@@ -186,40 +215,66 @@ class VotingPhase:
             'phase': self.game.phase
         })
 
-        if self.game.phase == "voting" and player_id in self.game.players:
-            set_index = self.game.idx_current_drawing_set
-
-            if set_index not in self.game.votes:
-                self.game.votes[set_index] = {}
-
-            # Check if player already voted for this set
-            previous_vote = self.game.votes[set_index].get(player_id)
-
-            self.game.votes[set_index][player_id] = drawing_id
-            self.game.players[player_id]['votes_cast'] += 1
-
-            debug_log("Vote recorded successfully", player_id, self.game.room_id, {
-                'drawing_id': drawing_id,
-                'set_index': set_index,
-                'previous_vote': previous_vote,
-                'total_votes_cast': self.game.players[player_id]['votes_cast']
-            })
-
-            socketio.emit('vote_cast', {
-                'player_id': player_id,
-                'set_index': set_index
-            }, room=self.game.room_id)
-
-            # Check if all eligible voters have voted - advance early if so
-            self.game.check_early_phase_advance('voting', socketio)
-            return True
-        else:
-            debug_log("Vote submission rejected", player_id, self.game.room_id, {
-                'drawing_id': drawing_id,
-                'phase': self.game.phase,
-                'player_exists': player_id in self.game.players
+        # Validate phase and player
+        if self.game.phase != "voting":
+            debug_log("Vote submission rejected - wrong phase", player_id, self.game.room_id, {
+                'current_phase': self.game.phase,
+                'drawing_id': drawing_id
             })
             return False
+            
+        if player_id not in self.game.players:
+            debug_log("Vote submission rejected - player not in game", player_id, self.game.room_id, {
+                'drawing_id': drawing_id
+            })
+            return False
+
+        if player_id not in self.get_eligible_voters_for_set(self.game.drawing_sets[self.game.idx_current_drawing_set]):
+            debug_log("Vote submission rejected - player not eligible to vote", player_id, self.game.room_id, {
+                'drawing_id': drawing_id,
+                'set_index': self.game.idx_current_drawing_set
+            })
+            return False
+
+        # Validate voting set index
+        if self.game.idx_current_drawing_set >= len(self.game.drawing_sets):
+            debug_log("Vote submission rejected - invalid set index", player_id, self.game.room_id, {
+                'set_index': self.game.idx_current_drawing_set,
+                'total_sets': len(self.game.drawing_sets)
+            })
+            return False
+
+        set_index = self.game.idx_current_drawing_set
+
+        if set_index not in self.game.votes:
+            self.game.votes[set_index] = {}
+
+        # Check if player already voted for this set
+        if player_id in self.game.votes[set_index]:
+            debug_log("Vote submission rejected - player already voted for this set", player_id, self.game.room_id, {
+                'drawing_id': drawing_id,
+                'set_index': set_index
+            })
+            return False
+
+        self.game.votes[set_index][player_id] = drawing_id
+        self.game.players[player_id]['votes_cast'] += 1
+
+        debug_log("Vote recorded successfully", player_id, self.game.room_id, {
+            'drawing_id': drawing_id,
+            'set_index': set_index,
+            'total_votes_cast': self.game.players[player_id]['votes_cast']
+        })
+
+        socketio.emit('vote_cast', {
+            'player_id': player_id,
+            'set_index': set_index
+        }, room=self.game.room_id)
+
+        # Check if all eligible voters have voted - advance early if so
+        if check_early_advance:
+            self.check_early_advance(socketio)
+        return True
 
     def next_voting_set(self, socketio):
         """Move to next voting set"""
@@ -228,6 +283,7 @@ class VotingPhase:
             'votes_received': len(self.game.votes.get(self.game.idx_current_drawing_set, {}))
         })
 
+        self.current_set_started = False  # Reset for next set
         self.game.idx_current_drawing_set += 1
         self.start_voting_on_set(socketio)
 
@@ -239,24 +295,31 @@ class VotingPhase:
                        if self.game.idx_current_drawing_set < n else None)
         if current_set:
             # Find eligible voters (those who didn't draw or copy in this set)
-            excluded_players = set()
-            for drawing in current_set['drawings']:
-                excluded_players.add(drawing['player_id'])
-
-            eligible_voters = [pid for pid in self.game.players if pid not in excluded_players]
+            eligible_voters = self.get_eligible_voters_for_set(current_set)
             set_votes = self.game.votes.get(self.game.idx_current_drawing_set, {})
 
             # Check if all eligible voters have voted
             all_voted = all(voter_id in set_votes for voter_id in eligible_voters)
+            
+            # Only advance early if we have eligible voters and they've all voted
+            # AND we've been in this voting set for at least 5 seconds to prevent rapid transitions
             if all_voted and len(eligible_voters) > 0:
-                debug_log(
-                    "All eligible players have voted - advancing to next voting set early", None, self.game.room_id)
-                # Cancel current timer
-                self.game.timer.cancel_phase_timer()
-                socketio.emit('early_phase_advance', {
-                    'next_phase': 'next_voting_set' if self.game.idx_current_drawing_set + 1 < n else 'results',
-                    'reason': 'All eligible players have voted'
-                }, room=self.game.room_id)
-                self.next_voting_set(socketio)
-                return True
+                # Add minimum time check to prevent rapid transitions
+                import time
+                current_time = time.time()
+                if not hasattr(self, 'set_start_time'):
+                    self.set_start_time = current_time
+                
+                # Require at least 5 seconds in this voting set before advancing
+                if current_time - self.set_start_time >= 5:
+                    debug_log(
+                        "All eligible players have voted - advancing to next voting set early", None, self.game.room_id)
+                    # Cancel current timer
+                    self.game.timer.cancel_phase_timer()
+                    socketio.emit('early_phase_advance', {
+                        'next_phase': 'next_voting_set' if self.game.idx_current_drawing_set + 1 < n else 'results',
+                        'reason': 'All eligible players have voted'
+                    }, room=self.game.room_id)
+                    self.next_voting_set(socketio)
+                    return True
         return False

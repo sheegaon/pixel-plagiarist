@@ -1,4 +1,4 @@
 # Game logic module for Pixel Plagiarist
-from .game_state import PixelPlagiarist
+from .game_state import GameStateGL
 
-__all__ = ['PixelPlagiarist']
+__all__ = ['GameStateGL']

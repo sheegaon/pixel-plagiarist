@@ -1,5 +1,5 @@
 # Betting phase logic for Pixel Plagiarist
-from logging_utils import debug_log
+from util.logging_utils import debug_log
 
 
 class BettingPhase:
@@ -29,48 +29,84 @@ class BettingPhase:
                 'prompt': prompt,
                 'min_stake': self.game.min_stake,
                 'phase': 'betting',
-                'timer': self.game.timer.get_betting_timer()
+                'timer': self.game.timer.get_betting_timer_duration()
             }, to=player_id)
 
         # Start betting timer
         self.game.timer.start_phase_timer(
             socketio, 
-            self.game.timer.get_betting_timer(), 
-            lambda: self.game.start_drawing_phase(socketio)
+            self.game.timer.get_betting_timer_duration(),
+            lambda: self.game.drawing_phase.start_phase(socketio)
         )
 
-    def place_bet(self, player_id, stake, socketio):
-        """Process a player's betting stake for the current round."""
-        debug_log("Player placing bet", player_id, self.game.room_id,
-                  {'stake_requested': stake, 'min_stake': self.game.min_stake, 'phase': self.game.phase})
+    def place_bet(self, player_id, stake, socketio, check_early_advance=True):
+        """Record a player's betting stake."""
+        debug_log("Player placing bet", player_id, self.game.room_id, {
+            'stake': stake,
+            'phase': self.game.phase,
+            'min_stake': self.game.min_stake
+        })
 
-        if player_id in self.game.players and self.game.phase == "betting":
-            original_stake = stake
-            stake = max(stake, self.game.min_stake)
-            old_balance = self.game.players[player_id]['balance']
-
-            self.game.players[player_id]['stake'] = stake
-            self.game.players[player_id]['balance'] -= stake
-            self.game.players[player_id]['has_bet'] = True
-
-            debug_log("Bet placed successfully", player_id, self.game.room_id, {
-                'original_stake': original_stake,
-                'final_stake': stake,
-                'old_balance': old_balance,
-                'new_balance': self.game.players[player_id]['balance']
+        # Validate phase
+        if self.game.phase != "betting":
+            debug_log("Bet submission rejected - wrong phase", player_id, self.game.room_id, {
+                'current_phase': self.game.phase,
+                'stake': stake
             })
+            return False
 
-            socketio.emit('bet_placed', {
-                'player_id': player_id,
+        # Validate player exists
+        if player_id not in self.game.players:
+            debug_log("Bet submission rejected - player not in game", player_id, self.game.room_id, {
+                'stake': stake
+            })
+            return False
+
+        # Prevent duplicate betting
+        if self.game.players[player_id]['has_bet']:
+            debug_log("Bet submission rejected - already placed bet", player_id, self.game.room_id, {
+                'existing_stake': self.game.players[player_id]['stake'],
+                'new_stake': stake
+            })
+            return False
+
+        # Validate stake amount
+        if stake < self.game.min_stake:
+            debug_log("Bet submission rejected - stake too low", player_id, self.game.room_id, {
                 'stake': stake,
-                'remaining_tokens': self.game.players[player_id]['balance']
-            }, room=self.game.room_id)
-            
-            # Check if all players have bet - advance early if so
-            self.game.check_early_phase_advance('betting', socketio)
-        else:
-            debug_log("Bet rejected - invalid conditions", player_id, self.game.room_id,
-                      {'phase': self.game.phase, 'player_exists': player_id in self.game.players})
+                'min_stake': self.game.min_stake
+            })
+            return False
+
+        if stake > self.game.players[player_id]['balance']:
+            debug_log("Bet submission rejected - insufficient balance", player_id, self.game.room_id, {
+                'stake': stake,
+                'balance': self.game.players[player_id]['balance']
+            })
+            return False
+
+        # Deduct stake from balance and record bet
+        self.game.players[player_id]['balance'] -= stake
+        self.game.players[player_id]['stake'] = stake
+        self.game.players[player_id]['has_bet'] = True
+
+        debug_log("Bet placed successfully", player_id, self.game.room_id, {
+            'stake': stake,
+            'new_balance': self.game.players[player_id]['balance'],
+            'players_bet': sum(1 for p in self.game.players.values() if p['has_bet']),
+            'total_players': len(self.game.players)
+        })
+
+        socketio.emit('bet_placed', {
+            'player_id': player_id,
+            'stake': stake,
+            'new_balance': self.game.players[player_id]['balance']
+        }, room=self.game.room_id)
+
+        # Check if all players have bet - advance early if so
+        if check_early_advance:
+            self.check_early_advance(socketio)
+        return True
 
     def check_early_advance(self, socketio):
         """Check if all players have bet and advance early if possible"""
@@ -83,7 +119,7 @@ class BettingPhase:
                 'next_phase': 'drawing',
                 'reason': 'All players have placed their bets'
             }, room=self.game.room_id)
-            self.game.start_drawing_phase(socketio)
+            self.game.drawing_phase.start_phase(socketio)
             return True
         return False
 

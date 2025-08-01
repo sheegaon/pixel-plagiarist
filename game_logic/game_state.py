@@ -1,17 +1,19 @@
 # Core game state management for Pixel Plagiarist
 import random
 from datetime import datetime
-from config import CONSTANTS, PROMPTS
-from logging_utils import debug_log
-from .game_timer import GameTimer
+from util.config import CONSTANTS, PROMPTS
+from util.logging_utils import debug_log
+
+# Import the modular components
+from .timer import Timer
 from .betting_phase import BettingPhase
 from .drawing_phase import DrawingPhase
 from .copying_phase import CopyingPhase
 from .voting_phase import VotingPhase
-from .scoring import ScoringEngine
+from .scoring_engine import ScoringEngine
 
 
-class PixelPlagiarist:
+class GameStateGL:
     """
     Core game logic for a Pixel Plagiarist game room.
     
@@ -32,12 +34,14 @@ class PixelPlagiarist:
         """
         self.room_id = room_id
         self.players = {}
-        self.phase = "waiting"  # waiting, betting, drawing, copying, voting, results
+        self.phase = "waiting"  # waiting, betting, drawing, copying_viewing, copying, voting, results
         self.prompt = None
         self.player_prompts = {}
         self.min_stake = min_stake
-        self.max_players = CONSTANTS['max_players']
+        self.max_players = CONSTANTS['MAX_PLAYERS']
         self.min_players = 3
+
+        # Game state
         self.original_drawings = {}
         self.copied_drawings = {}
         self.copy_assignments = {}
@@ -45,16 +49,21 @@ class PixelPlagiarist:
         self.idx_current_drawing_set = 0
         self.drawing_sets = []
         self.created_at = datetime.now()
-        self.countdown_start_time = None
-        self._stop_countdown = False  # Flag to stop countdown
+        self.percentage_penalties = {}
 
-        # Initialize phase handlers
-        self.timer = GameTimer(self)
-        self.betting = BettingPhase(self)
-        self.drawing = DrawingPhase(self)
-        self.copying = CopyingPhase(self)
-        self.voting = VotingPhase(self)
-        self.scoring = ScoringEngine(self)
+        # Countdown management
+        self.start_timer = None
+        self.countdown_timer = None
+        self.countdown_start_time = None
+        self._stop_countdown = False
+
+        # Initialize modular components
+        self.timer = Timer(self)
+        self.betting_phase = BettingPhase(self)
+        self.drawing_phase = DrawingPhase(self)
+        self.copying_phase = CopyingPhase(self)
+        self.voting_phase = VotingPhase(self)
+        self.scoring_engine = ScoringEngine(self)
 
     def add_player(self, player_id, username):
         """
@@ -78,6 +87,13 @@ class PixelPlagiarist:
         debug_log("Player attempting to join game", player_id, self.room_id,
                   {'username': username, 'current_players': len(self.players), 'phase': self.phase})
 
+        # Prevent duplicate additions
+        if player_id in self.players:
+            debug_log("Player already in game, updating username only", player_id, self.room_id,
+                     {'old_username': self.players[player_id]['username'], 'new_username': username})
+            self.players[player_id]['username'] = username
+            return True
+
         if len(self.players) >= self.max_players:
             debug_log("Player join rejected - room full", player_id, self.room_id, {'max_players': self.max_players})
             return False
@@ -85,7 +101,7 @@ class PixelPlagiarist:
         self.players[player_id] = {
             'id': player_id,
             'username': username,
-            'balance': CONSTANTS['initial_balance'],
+            'balance': CONSTANTS['INITIAL_BALANCE'],
             'stake': 0,
             'connected': True,
             'has_drawn_original': False,
@@ -125,10 +141,6 @@ class PixelPlagiarist:
                       {'players_remaining': len(self.players), 'min_required': self.min_players})
             self.end_game_early()
 
-    def start_countdown(self, socketio):
-        """Start countdown for more players using configured timer"""
-        self.timer.start_countdown(socketio)
-
     def start_game(self, socketio):
         """Start the game with current players."""
         if len(self.players) < self.min_players:
@@ -136,79 +148,59 @@ class PixelPlagiarist:
                       {'current_players': len(self.players), 'min_required': self.min_players})
             return
 
+        # Ensure countdown timer is stopped
+        if self.timer:
+            self.timer.stop_joining_countdown()
+
+        # Debug log for phase transition
+        debug_log("Transitioning to betting phase", None, self.room_id, {
+            'current_phase': self.phase,
+            'player_count': len(self.players)
+        })
+
+        # Update phase to betting
         self.phase = "betting"
-        debug_log("Game started", None, self.room_id, {'player_count': len(self.players)})
+
+        # Emit game started event to all players
+        for player_id, prompt in self.player_prompts.items():
+            socketio.emit('game_started', {
+                'prompt': prompt,
+                'min_stake': self.min_stake,
+                'phase': 'betting',
+                'timer': self.timer.get_betting_timer_duration()
+            }, to=player_id)
 
         # Clear any existing timers using the flag system
-        self.timer.stop_countdown()
+        self.timer.stop_joining_countdown()
 
         # Create a new default room since this one is now in progress
         from socket_handlers import check_and_create_default_room
         check_and_create_default_room(socketio)
 
         # Assign different random prompts to each player
-        self._assign_prompts()
-
-        debug_log("Game started with individual prompts", None, self.room_id,
-                  {'player_count': len(self.players), 'betting_timer': self.timer.get_betting_timer()})
-
-        # Start betting phase
-        self.betting.start_phase(socketio)
-
-    def _assign_prompts(self):
-        """Assign different random prompts to each player"""
         self.player_prompts = {}
         available_prompts = PROMPTS.copy()
         random.shuffle(available_prompts)
-        
+
         for i, player_id in enumerate(self.players.keys()):
             # Use modulo to cycle through prompts if we have more players than prompts
             prompt_index = i % len(available_prompts)
             self.player_prompts[player_id] = available_prompts[prompt_index]
 
-    def place_bet(self, player_id, stake, socketio):
-        """Process a player's betting stake for the current round."""
-        return self.betting.place_bet(player_id, stake, socketio)
+        debug_log("Game started with individual prompts", None, self.room_id,
+                  {'player_count': len(self.players), 'betting_timer': self.timer.get_betting_timer_duration()})
 
-    def start_drawing_phase(self, socketio):
-        """Start the drawing phase using configured timer"""
-        self.drawing.start_phase(socketio)
+        # Send individual prompts to each player
+        for player_id, prompt in self.player_prompts.items():
+            socketio.emit('game_started', {
+                'prompt': prompt,
+                'min_stake': self.min_stake,
+                'phase': 'betting',
+                'timer': self.timer.get_betting_timer_duration()
+            }, to=player_id)
 
-    def submit_original_drawing(self, player_id, drawing_data, socketio):
-        """Accept and store a player's original drawing submission."""
-        return self.drawing.submit_original_drawing(player_id, drawing_data, socketio)
-
-    def start_copying_phase(self, socketio):
-        """Start the copying phase with 10-second viewing period"""
-        self.copying.start_phase(socketio)
-
-    def submit_copied_drawing(self, player_id, target_id, drawing_data, socketio):
-        """Accept and store a player's copied drawing submission."""
-        return self.copying.submit_copied_drawing(player_id, target_id, drawing_data, socketio)
-
-    def start_voting_phase(self, socketio):
-        """Start the voting phase"""
-        self.voting.start_phase(socketio)
-
-    def start_voting_on_set(self, socketio):
-        """Start voting on current set using configured timer"""
-        return self.voting.start_voting_on_set(socketio)
-
-    def submit_vote(self, player_id, drawing_id, socketio):
-        """Record a player's vote for which drawing they think is original."""
-        return self.voting.submit_vote(player_id, drawing_id, socketio)
-
-    def next_voting_set(self, socketio):
-        """Move to next voting set"""
-        return self.voting.next_voting_set(socketio)
-
-    def calculate_results(self, socketio):
-        """Calculate final scores and distribute tokens"""
-        return self.scoring.calculate_results(socketio)
-
-    def distribute_tokens(self, scores):
-        """Distribute token rewards based on final scores"""
-        return self.scoring.distribute_tokens(scores)
+        # Start betting phase
+        self.betting_phase.start_phase(socketio)
 
     def end_game_early(self, socketio=None):
         """End game early due to insufficient players"""
@@ -228,24 +220,3 @@ class PixelPlagiarist:
                     'reason': 'Insufficient players',
                     'final_balance': {pid: self.players[pid]['balance'] for pid in self.players}
                 }, room=self.room_id)
-
-    def check_early_phase_advance(self, phase, socketio):
-        """
-        Check if all players have completed their actions for the current phase
-        and advance early if possible.
-        
-        Parameters
-        ----------
-        phase : str
-            The current phase to check ('betting', 'drawing', 'copying', 'voting')
-        socketio : SocketIO
-            Socket.IO instance for emitting events
-        """
-        if phase == 'betting':
-            return self.betting.check_early_advance(socketio)
-        elif phase == 'drawing':
-            return self.drawing.check_early_advance(socketio)
-        elif phase == 'copying':
-            return self.copying.check_early_advance(socketio)
-        elif phase == 'voting':
-            return self.voting.check_early_advance(socketio)

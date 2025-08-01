@@ -2,8 +2,11 @@
 class PlayerManager {
     constructor() {
         this.playerId = null;
-        this.currentBalance = GameConfig.STARTING_BALANCE;
+        this.currentBalance = GameConfig.INITIAL_BALANCE;
         this.playerList = [];
+        
+        // Initialize balance display after a short delay to ensure DOM is ready
+        setTimeout(() => this.updateBalanceDisplay(), 0);
     }
 
     setPlayerId(playerId) {
@@ -56,7 +59,7 @@ class PlayerManager {
 
     reset() {
         this.playerId = null;
-        this.currentBalance = GameConfig.STARTING_BALANCE;
+        this.currentBalance = GameConfig.INITIAL_BALANCE;
         this.playerList = [];
         this.updateBalanceDisplay();
     }

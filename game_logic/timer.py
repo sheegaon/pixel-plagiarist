@@ -1,11 +1,11 @@
 # Timer management for Pixel Plagiarist game phases
 import time
 import threading
-from config import TIMER_CONFIG
-from logging_utils import debug_log
+from util.config import TIMER_CONFIG
+from util.logging_utils import debug_log
 
 
-class GameTimer:
+class Timer:
     """
     Manages all timing functionality for game phases including countdown,
     phase timers, and early phase advancement checks.
@@ -25,26 +25,30 @@ class GameTimer:
         self.countdown_timer = None
         self.phase_timer = None
     
-    def start_countdown(self, socketio):
-        """Start countdown for more players using configured timer"""
-        debug_log("Starting countdown timer", None, self.game.room_id,
-                  {'countdown_seconds': TIMER_CONFIG['countdown'], 'player_count': len(self.game.players)})
+    def start_joining_countdown(self, socketio):
+        """Start countdown for more players to join using configured timer"""
+        # Prevent duplicate countdown starts
+        if self.start_timer is not None:
+            debug_log("Countdown already running, skipping duplicate start", None, self.game.room_id)
+            return
+
+        debug_log("Starting joining countdown timer", None, self.game.room_id,
+                  {'countdown_seconds': TIMER_CONFIG['joining'], 'player_count': len(self.game.players)})
 
         # Store countdown start time for late joiners
         self.game.countdown_start_time = time.time()
         self.game._stop_countdown = False
 
         def countdown():
-            for i in range(TIMER_CONFIG['countdown']):
+            for i in range(TIMER_CONFIG['joining']):
                 if self.game._stop_countdown:
-                    debug_log("Countdown cancelled", None, self.game.room_id)
+                    debug_log("Joining countdown cancelled", None, self.game.room_id)
                     return
                 time.sleep(1)
             
-            if (self.game.phase == "waiting" and 
-                len(self.game.players) >= self.game.min_players and 
-                not self.game._stop_countdown):
-                debug_log("Countdown completed - starting game", None, self.game.room_id,
+            if (self.game.phase == "waiting" and
+                    len(self.game.players) >= self.game.min_players and not self.game._stop_countdown):
+                debug_log("Joining countdown completed - starting game", None, self.game.room_id,
                           {'final_player_count': len(self.game.players)})
                 self.game.start_game(socketio)
 
@@ -56,13 +60,16 @@ class GameTimer:
         self.countdown_timer = self.start_timer
 
         # Emit countdown to all players in the room
-        socketio.emit('countdown_started', {'seconds': TIMER_CONFIG['countdown']}, room=self.game.room_id)
+        socketio.emit('joining_countdown_started', {'seconds': TIMER_CONFIG['joining']}, room=self.game.room_id)
 
-    def stop_countdown(self):
+    def stop_joining_countdown(self):
         """Stop the current countdown timer"""
-        if self.start_timer:
+        if self.start_timer is not None:
+            debug_log("Stopping joining countdown", None, self.game.room_id)
             self.game._stop_countdown = True
             self.start_timer = None
+            self.countdown_timer = None
+            self.game.countdown_start_time = None
 
     def start_phase_timer(self, socketio, seconds, callback):
         """
@@ -94,18 +101,22 @@ class GameTimer:
         if self.phase_timer:
             self.phase_timer = None
 
-    def get_betting_timer(self):
+    @staticmethod
+    def get_betting_timer_duration():
         """Get betting phase timer duration"""
         return TIMER_CONFIG['betting']
 
-    def get_drawing_timer(self):
+    @staticmethod
+    def get_drawing_timer_duration():
         """Get drawing phase timer duration"""
         return TIMER_CONFIG['drawing']
 
-    def get_copying_timer(self):
+    @staticmethod
+    def get_copying_timer_duration():
         """Get copying phase timer duration"""
         return TIMER_CONFIG['copying']
 
-    def get_voting_timer(self):
+    @staticmethod
+    def get_voting_timer_duration():
         """Get voting phase timer duration"""
         return TIMER_CONFIG['voting']

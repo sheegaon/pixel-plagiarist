@@ -1,6 +1,6 @@
 # Scoring and token distribution logic for Pixel Plagiarist
-from logging_utils import debug_log
-from config import CONSTANTS
+from util.logging_utils import debug_log
+from util.config import CONSTANTS
 
 
 class ScoringEngine:
@@ -19,6 +19,7 @@ class ScoringEngine:
             Reference to the main game instance
         """
         self.game = game
+        self.results_calculated = False  # Prevent duplicate calculations
 
     def calculate_results(self, socketio):
         """
@@ -28,12 +29,18 @@ class ScoringEngine:
         ----------
         socketio : SocketIO
         """
+        # Prevent duplicate calculations
+        if self.results_calculated:
+            debug_log("Results already calculated, skipping duplicate call", None, self.game.room_id)
+            return
+
         debug_log("Calculating game results", None, self.game.room_id, {
             'total_drawing_sets': len(self.game.drawing_sets),
             'total_votes_collected': sum(len(votes) for votes in self.game.votes.values())
         })
 
         self.game.phase = "results"
+        self.results_calculated = True  # Mark as calculated
 
         self.calculate_penalties()
 
@@ -44,8 +51,6 @@ class ScoringEngine:
         for set_index in range(len(self.game.drawing_sets)):
             vote_details.append(self.calculate_drawing_set_scores(set_index))
             scores = vote_details[-1]['scores']
-            debug_log("Drawing set scores calculated", None, self.game.room_id, {'scores': scores})
-
             self.distribute_tokens(set_index, scores)
 
         # Log game summary to global log file
@@ -54,7 +59,7 @@ class ScoringEngine:
         # Send results
         results = {
             'final_balance': {pid: self.game.players[pid]['balance'] for pid in self.game.players},
-            'vote_details': vote_details,
+            'vote_details': vote_details,  # Detailed scores for each drawing set, need to add code to show in UI
             'player_names': {pid: self.game.players[pid]['username'] for pid in self.game.players}
         }
 
@@ -73,18 +78,23 @@ class ScoringEngine:
             for drawing in drawing_set['drawings']:
                 if is_blank_image(drawing['drawing']):
                     player_id = drawing['player_id']
+                    debug_log("Blank image detected, applying penalty", player_id, self.game.room_id,
+                              {'drawing_id': drawing['id'], 'set_index': set_index,
+                               'blank_image_penalty': CONSTANTS['BLANK_IMAGE_PENALTY']})
                     if player_id not in self.game.percentage_penalties:
                         self.game.percentage_penalties[player_id] = 0
-                    self.game.percentage_penalties[player_id] += CONSTANTS['blank_image_penalty']
+                    self.game.percentage_penalties[player_id] += CONSTANTS['BLANK_IMAGE_PENALTY']
 
             # Apply a 2% penalty for non-artist players who did not vote
             votes_for_set = self.game.votes.get(set_index, {})
             artists_in_set = {drawing['player_id'] for drawing in drawing_set['drawings']}
             for player_id in self.game.players:
                 if player_id not in votes_for_set and player_id not in artists_in_set:
+                    debug_log("Non-voting player detected, applying penalty", player_id, self.game.room_id,
+                              {'set_index': set_index, 'non_voting_penalty': CONSTANTS['NON_VOTING_PENALTY']})
                     if player_id not in self.game.percentage_penalties:
                         self.game.percentage_penalties[player_id] = 0
-                    self.game.percentage_penalties[player_id] += CONSTANTS['non_voting_penalty']
+                    self.game.percentage_penalties[player_id] += CONSTANTS['NON_VOTING_PENALTY']
 
     def calculate_drawing_set_scores(self, set_index):
         drawing_set = self.game.drawing_sets[set_index]
@@ -151,10 +161,9 @@ class ScoringEngine:
         if not self.game.players:
             return
 
-        debug_log("Starting token distribution", None, self.game.room_id, {
-            'total_players': len(self.game.players),
-            'total_drawing_sets': len(self.game.drawing_sets)
-        })
+        total_score = sum(scores.values())
+        if total_score == 0:
+            return
 
         # Find all artists in this set
         drawing_set = self.game.drawing_sets[set_index]
@@ -164,57 +173,48 @@ class ScoringEngine:
         artists_stakes = {pid: self.game.players[pid]['stake'] for pid in artists_in_set}
         if not artists_stakes:
             return
-        total_pool_for_set = min(artists_stakes.values())
+        reward_pool = min(artists_stakes.values())
 
-        # Calculate contribution per artist based on number of artists
-        contribution_per_artist = total_pool_for_set / len(artists_in_set)
-        excess_stakes = {pid: self.game.players[pid]['stake'] - contribution_per_artist for pid in artists_in_set}
-        penalty_pool = 0
+        # Calculate excess stakes and penalties
+        excess_stakes = {pid: (self.game.players[pid]['stake'] - reward_pool) / len(artists_in_set)
+                         for pid in artists_in_set}
+        penalties = {pid: 0 for pid in self.game.players}
         for player_id in self.game.percentage_penalties:
             if player_id in excess_stakes:
-                penalty = excess_stakes[player_id] * self.game.percentage_penalties[player_id]
-                penalty_pool += penalty
-                excess_stakes[player_id] -= penalty
+                penalties[player_id] += excess_stakes[player_id] * self.game.percentage_penalties[player_id]
 
-        total_score = sum(scores.values())
-
-        debug_log("Processing set for token distribution", None, self.game.room_id, {
+        debug_log("Tokens available for distribution for set", None, self.game.room_id, {
             'set_index': set_index,
             'artists_in_set': len(artists_in_set),
-            'contribution_per_artist': contribution_per_artist,
-            'total_pool_for_set': total_pool_for_set,
+            'reward_pool': reward_pool,
             'total_score': total_score,
-            'penalty_pool': penalty_pool,
+            'penalty_pool': sum(penalties.values()),
         })
-
-        if total_score == 0:
-            return
 
         # Distribute pool based on point percentages
-        penalty_distribution = penalty_pool / len(scores)
-        for player_id in scores:
-            reward = (scores[player_id] / total_score) * total_pool_for_set
+        penalty_distribution = sum(penalties.values()) / len(self.game.players)
+        for player_id in self.game.players:
+            score_reward = (scores[player_id] / total_score) * reward_pool
             starting_balance = self.game.players[player_id]['balance']
-            self.game.players[player_id]['balance'] += reward + penalty_distribution + excess_stakes.get(player_id, 0)
+            self.game.players[player_id]['balance'] += (
+                    score_reward + penalty_distribution + excess_stakes.get(player_id, 0) - penalties[player_id])
 
-            debug_log("Awarded tokens from drawing set", player_id, self.game.room_id, {
+            debug_log("Awarded tokens to player for drawing set", player_id, self.game.room_id, {
                 'set_index': set_index,
+                'artist_stake': self.game.players[player_id]['stake'] / len(artists_in_set),
                 'points_earned': scores[player_id],
                 'starting_balance': starting_balance,
-                'reward': reward,
+                'score_reward': score_reward,
                 'penalty_distribution': penalty_distribution,
-                'excess_stake_returned': excess_stakes.get(player_id, 0),
+                'excess_stake': excess_stakes.get(player_id, 0),
+                'penalty_deduction': penalties[player_id],
                 'ending_balance': self.game.players[player_id]['balance'],
             })
-
-        debug_log("Token distribution complete", None, self.game.room_id, {
-            'final_balances': {pid: self.game.players[pid]['balance'] for pid in self.game.players}
-        })
 
     def _log_game_summary(self):
         """Log game summary to global log file"""
         try:
-            from game_logging import log_game_summary
+            from util.game_logging import log_game_summary
             log_game_summary(
                 room_id=self.game.room_id,
                 drawing_sets=self.game.drawing_sets,
@@ -231,7 +231,16 @@ def is_blank_image(base64_data):
     import io
     import base64
 
-    image_data = base64.b64decode(base64_data.split(',')[1])
-    img = Image.open(io.BytesIO(image_data)).convert('RGBA')
-    # Check if all pixels are white or transparent
-    return all(pixel[3] == 0 or pixel[:3] == (255, 255, 255) for pixel in img.getdata())
+    try:
+        # Ensure base64_data is valid and contains a comma
+        if not base64_data or ',' not in base64_data:
+            debug_log("Invalid base64 image data format in is_blank_image", None, None, {'data': str(base64_data)})
+            return True
+        image_data = base64.b64decode(base64_data.split(',')[1])
+        img = Image.open(io.BytesIO(image_data)).convert('RGBA')
+        # Check if all pixels are white or transparent
+        return all(pixel[3] == 0 or pixel[:3] == (255, 255, 255) for pixel in img.getdata())
+    except (OSError, Exception) as e:
+        # Log the error and treat as blank/invalid image
+        debug_log("Error decoding image in is_blank_image", None, None, {'error': str(e)})
+        return True

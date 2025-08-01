@@ -26,9 +26,10 @@ from flask_socketio import SocketIO
 from authlib.integrations.flask_client import OAuth
 
 # Import our modular components
-from config import CONSTANTS
-from logging_utils import setup_logging
+from util.config import CONSTANTS
+from util.logging_utils import setup_logging
 from socket_handlers import setup_socket_handlers
+from socket_handlers.game_state import game_state_sh
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -40,15 +41,15 @@ def load_oauth_config():
     """Load OAuth configuration from client secret JSON file"""
     try:
         # Find the client secret JSON file
-        current_dir = os.path.dirname(__file__)
-        json_files = [f for f in os.listdir(current_dir) if f.startswith('client_secret_') and f.endswith('.json')]
+        util_dir = os.path.join(os.path.dirname(__file__), 'util')
+        json_files = [f for f in os.listdir(util_dir) if f.startswith('client_secret_') and f.endswith('.json')]
 
         if not json_files:
             print("No client secret JSON file found. OAuth will be disabled.")
             return None, None
 
         json_file = json_files[0]  # Use the first one found
-        json_path = os.path.join(current_dir, json_file)
+        json_path = os.path.join(util_dir, json_file)
 
         with open(json_path, 'r') as f:
             config = json.load(f)
@@ -196,6 +197,19 @@ def health_check():
     return {'status': 'healthy', 'service': 'pixel_plagiarist'}
 
 
+@app.route('/util/config.json')
+def serve_config():
+    """Serve the configuration JSON file"""
+    config_path = os.path.join(os.path.dirname(__file__), 'util', 'config.json')
+    try:
+        with open(config_path, 'r') as f:
+            config_data = json.load(f)
+        return config_data
+    except Exception as e:
+        logger.error(f"Error serving config.json: {e}")
+        return {'error': 'Configuration not found'}, 404
+
+
 @app.route('/leaderboard')
 def leaderboard():
     """Display the leaderboard page"""
@@ -330,8 +344,7 @@ if __name__ == '__main__':
 
     # Ensure there's always a default room available on startup
     try:
-        from socket_handlers import ensure_default_room
-        ensure_default_room()
+        game_state_sh.ensure_default_room()
         logger.info("Default $10 room created on server startup")
     except Exception as e:
         logger.error(f"Failed to create default room on startup: {e}")

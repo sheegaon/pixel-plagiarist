@@ -1,8 +1,8 @@
 # Administrative handlers for socket events
 from flask import request
 from flask_socketio import emit
-from logging_utils import debug_log
-from .game_state import game_state, broadcast_room_list
+from util.logging_utils import debug_log
+from .game_state import game_state_sh, broadcast_room_list
 
 
 class AdminHandlers:
@@ -14,12 +14,12 @@ class AdminHandlers:
     def handle_debug_game_state(self, data=None):
         """Handle debug game state request"""
         debug_info = {
-            'total_games': len(game_state.GAMES),
-            'total_players': len(game_state.PLAYERS),
+            'total_games': len(game_state_sh.GAMES),
+            'total_players': len(game_state_sh.PLAYERS),
             'games': {}
         }
 
-        for room_id, game in game_state.GAMES.items():
+        for room_id, game in game_state_sh.GAMES.items():
             debug_info['games'][room_id] = {
                 'players': len(game.players),
                 'phase': game.phase,
@@ -34,8 +34,8 @@ class AdminHandlers:
         room_id = data.get('room_id', '').upper()
         player_id = request.sid
 
-        if room_id in game_state.GAMES:
-            game = game_state.get_game(room_id)
+        if room_id in game_state_sh.GAMES:
+            game = game_state_sh.get_game(room_id)
             if game.phase == "waiting":
                 debug_log("Force starting game", player_id, room_id, {'admin_action': True})
                 game.start_game(self.socketio)
@@ -58,15 +58,15 @@ class AdminHandlers:
         """Handle room cleanup request"""
         cleaned_rooms = []
         
-        for room_id in list(game_state.GAMES.keys()):
-            game = game_state.get_game(room_id)
+        for room_id in list(game_state_sh.GAMES.keys()):
+            game = game_state_sh.get_game(room_id)
             if len(game.players) == 0:
-                game_state.remove_game(room_id)
+                game_state_sh.remove_game(room_id)
                 cleaned_rooms.append(room_id)
                 debug_log("Cleaned up empty room", None, room_id, {'admin_cleanup': True})
 
         # Ensure there's a default room after cleanup
-        new_room_id = game_state.ensure_default_room()
+        new_room_id = game_state_sh.ensure_default_room()
         if new_room_id:
             debug_log("Created replacement default room after cleanup", None, new_room_id, {'min_stake': 10})
 

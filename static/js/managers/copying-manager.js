@@ -6,13 +6,24 @@ class CopyingManager {
         this.currentTargetId = null;
         this.submittedCopies = 0;
         this.isInViewingPhase = false;
+        this.drawing = null;
+        this.total_timer = 0;
+        this.remaining_time = 0;
+        this.initialized = false;  // Prevent duplicate initializations
     }
 
     initializeCopyingViewingPhase(data) {
+        // Prevent duplicate initializations
+        if (this.initialized && this.copyTargets.length > 0) {
+            console.log('Copying phase already initialized, skipping duplicate');
+            return;
+        }
+        
         this.copyTargets = data.targets || [];
         this.currentCopyIndex = 0;
         this.submittedCopies = 0;
         this.isInViewingPhase = true;
+        this.initialized = true;
         
         uiManager.showView('copying');
         this.displayViewingPhase();
@@ -32,7 +43,7 @@ class CopyingManager {
         const copyTargets = document.getElementById('copyTargets');
         if (!copyTargets) return;
         
-        copyTargets.innerHTML = '<h3>Viewing Period (10 seconds)</h3><p>Study this drawing carefully!</p>';
+        copyTargets.innerHTML = '<h3>Viewing Period</h3><p>Study this drawing carefully!</p>';
         
         if (this.copyTargets.length > 0) {
             const target = this.copyTargets[0];
@@ -90,6 +101,17 @@ class CopyingManager {
     }
 
     submitCurrentCopy() {
+        // Validate phase before submission
+        if (gameStateManager.getPhase() !== GameConfig.PHASES.COPYING) {
+            uiManager.showError('Cannot submit copy during this phase');
+            return;
+        }
+        
+        if (this.isInViewingPhase) {
+            uiManager.showError('Cannot submit during viewing phase');
+            return;
+        }
+
         if (this.currentCopyIndex >= this.copyTargets.length) {
             uiManager.showError('No more copies to submit');
             return;
@@ -213,6 +235,7 @@ class CopyingManager {
         this.currentTargetId = null;
         this.submittedCopies = 0;
         this.isInViewingPhase = false;
+        this.initialized = false;
         
         const submitButton = document.getElementById('submitCopyBtn');
         if (submitButton) {

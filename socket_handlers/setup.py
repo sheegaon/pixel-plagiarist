@@ -3,7 +3,7 @@ from .connection_handlers import ConnectionHandlers
 from .room_handlers import RoomHandlers
 from .game_handlers import GameHandlers
 from .admin_handlers import AdminHandlers
-from .game_state import game_state
+from .game_state import game_state_sh
 
 
 def setup_socket_handlers(socketio):
@@ -22,7 +22,7 @@ def setup_socket_handlers(socketio):
     admin_handlers = AdminHandlers(socketio)
     
     # Ensure default room exists
-    game_state.ensure_default_room()
+    game_state_sh.ensure_default_room()
     
     # Register connection handlers
     socketio.on_event('connect', connection_handlers.handle_connect)
@@ -36,7 +36,7 @@ def setup_socket_handlers(socketio):
     
     # Register gameplay handlers
     socketio.on_event('place_bet', game_handlers.handle_place_bet)
-    socketio.on_event('submit_drawing', game_handlers.handle_submit_drawing)
+    socketio.on_event('submit_original', game_handlers.handle_submit_original)
     socketio.on_event('submit_copy', game_handlers.handle_submit_copy)
     socketio.on_event('submit_vote', game_handlers.handle_submit_vote)
     socketio.on_event('request_review', game_handlers.handle_request_review)

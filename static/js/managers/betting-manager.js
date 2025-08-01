@@ -3,13 +3,12 @@ class BettingManager {
     constructor() {
         this.currentStake = 0;
         this.minStake = 0;
-        this.maxStake = 0;
         this.betPlaced = false;
     }
 
     initializeBetting(data) {
         this.minStake = data.min_stake;
-        this.maxStake = Math.min(playerManager.getBalance(), data.min_stake * 10);
+        this.currentStake = this.minStake;
         this.betPlaced = false;
         
         this.setupStakeButtons();
@@ -46,13 +45,14 @@ class BettingManager {
                 const button = document.createElement('button');
                 button.className = 'stake-option-btn';
                 button.textContent = `${multiplier}x ($${stakeAmount})`;
+                // button.setAttribute('data-stake', stakeAmount); // Add data attribute for exact matching
                 button.onclick = () => this.selectStake(stakeAmount);
                 stakeButtonsContainer.appendChild(button);
             }
         });
         
         // Select the minimum stake by default
-        this.selectStake(this.minStake);
+        // this.selectStake(this.minStake);
     }
 
     selectStake(stake) {
@@ -63,7 +63,7 @@ class BettingManager {
         const buttons = document.querySelectorAll('.stake-option-btn');
         buttons.forEach(btn => {
             btn.classList.remove('selected');
-            if (btn.textContent.includes(`$${stake}`)) {
+            if (btn.textContent === `$${stake}`) {
                 btn.classList.add('selected');
             }
         });
@@ -84,20 +84,31 @@ class BettingManager {
     }
 
     placeBet() {
+        // Validate phase before placing bet
+        if (gameStateManager.getPhase() !== GameConfig.PHASES.BETTING) {
+            uiManager.showError('Cannot place bet during this phase');
+            return;
+        }
+
         if (this.betPlaced) {
             uiManager.showError('Bet already placed');
             return;
         }
 
-        if (this.currentStake < this.minStake) {
-            uiManager.showError('Please select a stake amount');
+        const stakeValue = parseInt(this.currentStake);
+        if (isNaN(stakeValue) || stakeValue < this.minStake) {
+            uiManager.showError(`Minimum stake is $${this.minStake}`);
             return;
         }
 
-        if (this.currentStake > playerManager.getBalance()) {
+        if (stakeValue > playerManager.getBalance()) {
             uiManager.showError('Insufficient balance');
             return;
         }
+        
+        socketHandler.emit('place_bet', { stake: stakeValue });
+
+        this.betPlaced = true;
         
         const betButton = document.getElementById('betButton');
         if (betButton) {
@@ -105,10 +116,12 @@ class BettingManager {
             betButton.textContent = 'Bet Placed';
         }
         
-        socketHandler.emit('place_bet', { stake: this.currentStake });
-        playerManager.adjustBalance(-this.currentStake);
-        this.betPlaced = true;
-        uiManager.showSuccess('Bet placed successfully!');
+        const stakeSlider = document.getElementById('stakeSlider');
+        if (stakeSlider) {
+            stakeSlider.disabled = true;
+        }
+        
+        uiManager.showSuccess(`Bet of $${stakeValue} placed successfully!`);
     }
 
     autoPlaceBet() {
@@ -130,7 +143,6 @@ class BettingManager {
     reset() {
         this.currentStake = 0;
         this.minStake = 0;
-        this.maxStake = 0;
         this.betPlaced = false;
         
         const betButton = document.getElementById('betButton');

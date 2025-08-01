@@ -1,5 +1,5 @@
 # Drawing phase logic for Pixel Plagiarist
-from logging_utils import debug_log
+from util.logging_utils import debug_log
 
 
 class DrawingPhase:
@@ -22,51 +22,67 @@ class DrawingPhase:
     def start_phase(self, socketio):
         """Start the drawing phase using configured timer"""
         debug_log("Starting drawing phase", None, self.game.room_id,
-                  {'timer': self.game.timer.get_drawing_timer(), 'player_count': len(self.game.players)})
+                  {'timer': self.game.timer.get_drawing_timer_duration(), 'player_count': len(self.game.players)})
 
         self.game.phase = "drawing"
 
         # Set default stakes for players who didn't bet
-        self.game.betting.apply_default_stakes()
+        self.game.betting_phase.apply_default_stakes()
 
         # Send individual prompts to each player
         for player_id, prompt in self.game.player_prompts.items():
             socketio.emit('phase_changed', {
                 'phase': 'drawing',
                 'prompt': prompt,
-                'timer': self.game.timer.get_drawing_timer()
+                'timer': self.game.timer.get_drawing_timer_duration()
             }, to=player_id)
 
         self.game.timer.start_phase_timer(
             socketio, 
-            self.game.timer.get_drawing_timer(), 
-            lambda: self.game.start_copying_phase(socketio)
+            self.game.timer.get_drawing_timer_duration(),
+            lambda: self.game.copying_phase.start_phase(socketio)
         )
 
-    def submit_original_drawing(self, player_id, drawing_data, socketio):
+    def submit_drawing(self, player_id, drawing_data, socketio, check_early_advance=True):
         """Accept and store a player's original drawing submission."""
         debug_log("Player submitting original drawing", player_id, self.game.room_id,
                   {'phase': self.game.phase, 'data_length': len(drawing_data) if drawing_data else 0})
 
-        if player_id in self.game.players and self.game.phase == "drawing":
-            self.game.original_drawings[player_id] = drawing_data
-            self.game.players[player_id]['has_drawn_original'] = True
-
-            debug_log("Original drawing submitted successfully", player_id, self.game.room_id,
-                      {'total_originals': len(self.game.original_drawings)})
-
-            socketio.emit('drawing_submitted', {
-                'player_id': player_id,
-                'type': 'original'
-            }, room=self.game.room_id)
-            
-            # Check if all players have drawn - advance early if so
-            self.game.check_early_phase_advance('drawing', socketio)
-            return True
-        else:
-            debug_log("Original drawing submission rejected", player_id, self.game.room_id,
-                      {'phase': self.game.phase, 'player_exists': player_id in self.game.players})
+        # Validate phase
+        if self.game.phase != "drawing":
+            debug_log("Drawing submission rejected - wrong phase", player_id, self.game.room_id, {
+                'current_phase': self.game.phase
+            })
             return False
+
+        # Validate player exists
+        if player_id not in self.game.players:
+            debug_log("Drawing submission rejected - player not in game", player_id, self.game.room_id)
+            return False
+
+        # Prevent duplicate submissions
+        if self.game.players[player_id]['has_drawn_original']:
+            debug_log("Drawing submission rejected - already submitted", player_id, self.game.room_id)
+            return False
+
+        self.game.original_drawings[player_id] = drawing_data
+        self.game.players[player_id]['has_drawn_original'] = True
+
+        debug_log("Original drawing submitted successfully", player_id, self.game.room_id, {
+            'total_drawings': len(self.game.original_drawings),
+            'total_players': len(self.game.players)
+        })
+
+        socketio.emit('original_submitted', {
+            'player_id': player_id,
+            'total_submitted': len(self.game.original_drawings),
+            'total_players': len(self.game.players)
+        }, room=self.game.room_id)
+
+        # Check if all players have drawn - advance early if so
+        if check_early_advance:
+            self.check_early_advance(socketio)
+        return True
 
     def check_early_advance(self, socketio):
         """Check if all players have drawn and advance early if possible"""
@@ -79,6 +95,6 @@ class DrawingPhase:
                 'next_phase': 'copying',
                 'reason': 'All players have submitted their drawings'
             }, room=self.game.room_id)
-            self.game.start_copying_phase(socketio)
+            self.game.copying_phase.start_phase(socketio)
             return True
         return False

@@ -1,6 +1,6 @@
 # Logging utilities for Pixel Plagiarist server
 import logging
-from config import CONSTANTS
+from util.config import CONSTANTS
 
 
 def setup_logging():

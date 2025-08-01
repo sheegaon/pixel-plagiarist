@@ -3,11 +3,13 @@ class GameManager {
     constructor() {
         this.username = window.gameUserData ? window.gameUserData.username : 'Anonymous';
         
-        // Initialize specialized managers
-        this.initializeManagers();
+        // Don't initialize managers in constructor - wait for explicit initialization
+        this.managersInitialized = false;
     }
 
     initializeManagers() {
+        if (this.managersInitialized) return;
+        
         // Create global instances of all managers
         window.roomManager = new RoomManager();
         window.playerManager = new PlayerManager();
@@ -17,19 +19,13 @@ class GameManager {
         window.copyingManager = new CopyingManager();
         window.votingManager = new VotingManager();
         window.resultsManager = new ResultsManager();
+        
+        this.managersInitialized = true;
     }
 
     // Delegation methods for room management
     createRoomWithStake(minStake) {
         roomManager.createRoomWithStake(minStake);
-    }
-
-    joinRoom(roomId = null) {
-        roomManager.joinRoom(roomId);
-    }
-
-    joinRoomFromList(roomId) {
-        roomManager.joinRoomFromList(roomId);
     }
 
     joinRoomByCode() {
@@ -53,11 +49,6 @@ class GameManager {
         bettingManager.placeBet();
     }
 
-    setupStakeSlider() {
-        // This is called during initialization but actual setup is handled by betting manager
-        console.log('Stake slider will be set up when betting phase starts');
-    }
-
     // Delegation methods for drawing
     submitDrawing() {
         drawingManager.submitDrawing();
@@ -66,10 +57,6 @@ class GameManager {
     // Delegation methods for copying
     submitCurrentCopy() {
         copyingManager.submitCurrentCopy();
-    }
-
-    requestReview(targetId) {
-        copyingManager.requestReview(targetId);
     }
 
     // Delegation methods for voting
@@ -169,6 +156,12 @@ class GameManager {
     }
 
     handleCopyingAssignment(data) {
+        // Only process if we're not already in copying phase
+        if (gameStateManager.getPhase() === GameConfig.PHASES.COPYING) {
+            console.log('Already in copying phase, ignoring duplicate assignment');
+            return;
+        }
+        
         gameStateManager.setPhase(GameConfig.PHASES.COPYING);
         copyingManager.initializeCopyingViewingPhase(data);
         
@@ -182,11 +175,24 @@ class GameManager {
     }
 
     handleCopyingViewingPhase(data) {
+        // Transition to copying phase and initialize viewing
+        gameStateManager.setPhase(GameConfig.PHASES.COPYING);
         copyingManager.initializeCopyingViewingPhase(data);
+        
+        // Start copying timer with auto-submit callback
+        uiManager.startTimer('copyingTimer', data.total_timer, () => {
+            if (gameStateManager.getPhase() === GameConfig.PHASES.COPYING) {
+                copyingManager.autoSubmitRemainingCopies();
+                uiManager.showError('Time up! Remaining copies submitted automatically.');
+            }
+        });
     }
 
     handleCopyingPhaseStarted(data) {
-        gameStateManager.setPhase(GameConfig.PHASES.COPYING);
+        // Only transition if we're in the correct phase
+        if (gameStateManager.getPhase() !== GameConfig.PHASES.COPYING) {
+            gameStateManager.setPhase(GameConfig.PHASES.COPYING);
+        }
         copyingManager.startCopyingPhase(data);
     }
 
@@ -310,12 +316,12 @@ class GameManager {
             const element = document.getElementById(id);
             if (element) {
                 if (id === 'roomInfo') element.textContent = 'Room: -';
-                else if (id === 'balanceInfo') element.textContent = `Balance: $${GameConfig.STARTING_BALANCE}`;
+                else if (id === 'balanceInfo') element.textContent = `Balance: $${GameConfig.INITIAL_BALANCE}`;
                 else element.textContent = '';
             }
         });
     }
 }
 
-// Create global instance
-const gameManager = new GameManager();
+// Don't create global instance immediately - let main.js handle this
+let gameManager = null;
