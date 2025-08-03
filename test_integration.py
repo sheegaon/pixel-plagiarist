@@ -3,7 +3,7 @@ Integration tests for Pixel Plagiarist multiplayer drawing game.
 
 Tests the complete game flow including:
 - Room management (creation, joining, leaving)
-- Game phases (betting, drawing, copying, voting, results)
+- Game phases (drawing, copying, voting, results)
 - Socket event handling and broadcasting  
 - State transitions and synchronization
 - Player management and disconnection handling
@@ -144,10 +144,10 @@ class DirectGameTestHelper:
         self.room_id = None
         self.player_id = f"test_{uuid.uuid4().hex[:16]}"
         
-    def create_room(self, min_stake=10):
+    def create_room(self, stake=100):
         """Create a room directly"""
         self.room_id = str(uuid.uuid4())[:8].upper()
-        game = GameStateGL(self.room_id, min_stake)
+        game = GameStateGL(self.room_id, stake)
         game_state_sh.add_game(self.room_id, game)
         return self.room_id
     
@@ -189,34 +189,11 @@ def socketio_app(test_app):
 
 
 @pytest.fixture
-def clients(socketio_app, test_app):
-    """Create multiple test clients for multiplayer testing"""
-    client1 = socketio_app.test_client(test_app)
-    client2 = socketio_app.test_client(test_app)
-    client3 = socketio_app.test_client(test_app)
-    
-    # Wrap in helper class
-    helpers = [
-        SocketiOTestHelper(client1, "Alice"),
-        SocketiOTestHelper(client2, "Bob"), 
-        SocketiOTestHelper(client3, "Carol")
-    ]
-    
-    # Set player IDs to socket IDs after connection
-    for helper in helpers:
-        helper.player_id = helper.socket_id
-    
-    return helpers
-
-
-@pytest.fixture
-def direct_clients():
+def direct_clients(n=3):
     """Create direct game manipulation clients for easier testing"""
-    return [
-        DirectGameTestHelper("Alice"),
-        DirectGameTestHelper("Bob"),
-        DirectGameTestHelper("Carol")
-    ]
+    players = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank', 'Grace', 'Heidi', 'Ivan', 'Judy',
+               'Karl', 'Leo', 'Mallory', 'Nina', 'Oscar', 'Peggy', 'Quentin', 'Rupert', 'Sybil', 'Trent']
+    return [DirectGameTestHelper(players[n]) for n in range(n)]
 
 
 @pytest.fixture
@@ -239,7 +216,7 @@ class TestRoomManagement:
         alice, bob, carol = direct_clients
         
         # Alice creates a room
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room()
         assert room_id is not None
         assert room_id in game_state_sh.GAMES
         
@@ -270,7 +247,7 @@ class TestRoomManagement:
         alice, bob = direct_clients[:2]
         
         # Create room and add players
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room()
         alice.join_room(room_id)
         bob.join_room(room_id)
         
@@ -297,29 +274,21 @@ class TestGameFlow:
         alice, bob, carol = direct_clients
         
         # 1. Room Setup
-        room_id = alice.create_room(min_stake=10)
-        alice.join_room(room_id)
-        bob.join_room(room_id)
-        carol.join_room(room_id)
+        room_id = alice.create_room()
+        assert alice.join_room(room_id), "Failed to join room"
+        assert bob.join_room(room_id), "Failed to join room"
+        assert carol.join_room(room_id), "Failed to join room"
         
         # Get game instance
         game = game_state_sh.get_game(room_id)
         assert game is not None
         assert len(game.players) == 3
         
-        # 2. Start Game (triggers betting phase)
+        # 2. Start Game (triggers drawing phase)
         game.start_game(app_socketio)
-        assert game.phase == "betting"
-        
-        # 3. Betting Phase - directly place bets
-        game.betting_phase.place_bet(alice.player_id, 10, app_socketio, check_early_advance=False)
-        game.betting_phase.place_bet(bob.player_id, 15, app_socketio, check_early_advance=False)
-        game.betting_phase.place_bet(carol.player_id, 20, app_socketio, check_early_advance=False)
-        
-        # Manually advance to drawing phase
-        game.drawing_phase.start_phase(app_socketio)
         assert game.phase == "drawing"
-        
+        game.drawing_phase.start_phase(app_socketio)
+
         # 4. Drawing Phase - directly submit drawings
         alice_drawing = alice.create_sample_drawing()
         bob_drawing = bob.create_sample_drawing()
@@ -379,7 +348,7 @@ class TestGameFlow:
         alice = direct_clients[0]
         
         # Setup minimal game state
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room()
         alice.join_room(room_id)
         game = game_state_sh.get_game(room_id)
         
@@ -407,7 +376,7 @@ class TestErrorHandling:
         alice = direct_clients[0]
         
         # Create room
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room()
         alice.join_room(room_id)
         game = game_state_sh.get_game(room_id)
         
@@ -417,21 +386,13 @@ class TestErrorHandling:
         
         # Should be rejected (no drawing should be stored)
         assert len(game.original_drawings) == 0
-        
-        # Try to place bet during waiting phase
-        game.betting_phase.place_bet(alice.player_id, 10, app_socketio)
-        
-        # Should be rejected
-        player_data = game.players.get(alice.player_id)
-        if player_data:
-            assert player_data.get('has_bet', False) is False
-    
+
     def test_game_early_termination(self, direct_clients, clean_game_state):
         """Test game ending early due to insufficient players"""
         alice, bob, carol = direct_clients
         
         # Setup game with 3 players
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room()
         alice.join_room(room_id)
         bob.join_room(room_id)
         carol.join_room(room_id)
@@ -447,7 +408,7 @@ class TestErrorHandling:
         game.end_game_early(app_socketio)
         # Check if phase changed - this might not always be 'ended_early'
         # depending on implementation
-        assert game.phase in ["ended_early", "betting", "results"]  # Allow various states
+        assert game.phase in ["ended_early", "results"]  # Allow various states
 
 
 class TestScoringAndTokens:
@@ -458,22 +419,15 @@ class TestScoringAndTokens:
         alice, bob, carol = direct_clients
 
         # Setup game
-        room_id = alice.create_room(min_stake=10)
-        alice.join_room(room_id)
-        bob.join_room(room_id)
-        carol.join_room(room_id)
+        room_id = alice.create_room()
+        assert alice.join_room(room_id), "Failed to join room"
+        assert bob.join_room(room_id), "Failed to join room"
+        assert carol.join_room(room_id), "Failed to join room"
         
         game = game_state_sh.get_game(room_id)
         
         # Set up staking scenario
         initial_balances = {player_id: player_data['balance'] for player_id, player_data in game.players.items()}
-        game.phase = "betting"
-        assert game.betting_phase.place_bet(alice.player_id, 10, app_socketio, check_early_advance=False), \
-            "Alice should be able to place a valid bet"
-        assert game.betting_phase.place_bet(bob.player_id, 15, app_socketio, check_early_advance=False), \
-            "Bob should be able to place a valid bet"
-        assert game.betting_phase.place_bet(carol.player_id, 20, app_socketio, check_early_advance=False), \
-            "Carol should be able to place a valid bet"
 
         # Set up drawing phase
         game.phase = "drawing"
@@ -545,8 +499,8 @@ class TestConcurrentGames:
         carol2 = DirectGameTestHelper("Carol2")
         
         # Create two separate rooms
-        room1_id = alice1.create_room(min_stake=10)
-        room2_id = alice2.create_room(min_stake=25)
+        room1_id = alice1.create_room()
+        room2_id = alice2.create_room(stake=250)
         
         # Verify rooms are separate
         assert room1_id != room2_id

@@ -20,7 +20,7 @@ class ResultsManager {
             .map(([pid, tokens]) => ({
                 id: pid,
                 name: data.player_names[pid] || `Player ${pid}`,
-                tokens: Math.round(tokens * 100) / 100  // Round to nearest cent
+                tokens: Math.round(tokens)
             }))
             .sort((a, b) => b.tokens - a.tokens);
     }

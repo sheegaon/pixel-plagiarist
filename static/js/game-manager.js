@@ -14,7 +14,6 @@ class GameManager {
         window.roomManager = new RoomManager();
         window.playerManager = new PlayerManager();
         window.gameStateManager = new GameStateManager();
-        window.bettingManager = new BettingManager();
         window.drawingManager = new DrawingManager();
         window.copyingManager = new CopyingManager();
         window.votingManager = new VotingManager();
@@ -44,24 +43,9 @@ class GameManager {
         roomManager.leaveRoom();
     }
 
-    // Delegation methods for betting
-    placeBet() {
-        bettingManager.placeBet();
-    }
-
-    // Delegation methods for drawing
-    submitDrawing() {
-        drawingManager.submitDrawing();
-    }
-
     // Delegation methods for copying
     submitCurrentCopy() {
         copyingManager.submitCurrentCopy();
-    }
-
-    // Delegation methods for voting
-    selectVote(drawingId, element) {
-        votingManager.selectDrawing(drawingId, element);
     }
 
     submitVote() {
@@ -119,7 +103,7 @@ class GameManager {
     }
 
     handleGameStarted(data) {
-        gameStateManager.setPhase(GameConfig.PHASES.BETTING);
+        gameStateManager.setPhase(GameConfig.PHASES.DRAWING);
         gameStateManager.setGameData(data);
         
         // Set prompt in UI
@@ -128,13 +112,13 @@ class GameManager {
             promptText.textContent = data.prompt;
         }
         
-        bettingManager.initializeBetting(data);
-        
-        // Start betting timer with auto-submit callback
-        uiManager.startTimer('bettingTimer', data.timer, () => {
-            if (gameStateManager.getPhase() === GameConfig.PHASES.BETTING) {
-                bettingManager.autoPlaceBet();
-                uiManager.showError('Time up! Bet placed automatically.');
+        drawingManager.initializeDrawing(data);
+
+        // Start drawing timer with auto-submit callback
+        uiManager.startTimer('drawingTimer', data.timer, () => {
+            if (gameStateManager.getPhase() === GameConfig.PHASES.DRAWING) {
+                drawingManager.autoSubmitDrawing();
+                uiManager.showError('Time up! Drawing submitted automatically.');
             }
         });
     }
@@ -266,7 +250,6 @@ class GameManager {
         roomManager.reset();
         playerManager.reset();
         gameStateManager.reset();
-        bettingManager.reset();
         drawingManager.reset();
         copyingManager.reset();
         votingManager.reset();
@@ -275,10 +258,6 @@ class GameManager {
 
     updateBalanceDisplay() {
         playerManager.updateBalanceDisplay();
-    }
-
-    updateRoomDisplay(roomId) {
-        roomManager.updateRoomDisplay(roomId);
     }
 
     // Getters for backward compatibility and external access

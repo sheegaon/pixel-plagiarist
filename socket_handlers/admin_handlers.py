@@ -68,7 +68,7 @@ class AdminHandlers:
         # Ensure there's a default room after cleanup
         new_room_id = game_state_sh.ensure_default_room()
         if new_room_id:
-            debug_log("Created replacement default room after cleanup", None, new_room_id, {'min_stake': 10})
+            debug_log("Created replacement default room after cleanup", None, new_room_id)
 
         # Broadcast updated room list
         broadcast_room_list()

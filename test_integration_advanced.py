@@ -33,7 +33,7 @@ class TestTimerAndPhaseTransitions:
         alice, bob, carol = direct_clients
         
         # Setup game
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         carol.join_room(room_id)
@@ -60,7 +60,7 @@ class TestTimerAndPhaseTransitions:
         alice, bob, carol = direct_clients
         
         # Setup game in betting phase
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         carol.join_room(room_id)
@@ -86,7 +86,7 @@ class TestTimerAndPhaseTransitions:
         alice = direct_clients[0]
         
         # In testing mode, all timers should be 5 seconds
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         game = game_state_sh.get_game(room_id)
         
@@ -110,7 +110,7 @@ class TestEventBroadcasting:
         alice, bob, carol = direct_clients
         
         # Setup room with all players
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         carol.join_room(room_id)
@@ -133,7 +133,7 @@ class TestEventBroadcasting:
         alice, bob, carol = direct_clients
         
         # Setup game
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         carol.join_room(room_id)
@@ -165,7 +165,7 @@ class TestDataValidation:
         alice = direct_clients[0]
         
         # Setup game in drawing phase
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         game = game_state_sh.get_game(room_id)
         game.phase = "drawing"
@@ -214,7 +214,7 @@ class TestDataValidation:
             # Create a fresh helper for each test to avoid conflicts
             test_helper = DirectGameTestHelper(username)
             
-            room_id = test_helper.create_room(min_stake=10)
+            room_id = test_helper.create_room(stake=10)
             test_helper.join_room(room_id)
             
             game = game_state_sh.get_game(room_id)
@@ -233,7 +233,7 @@ class TestDataValidation:
         alice, bob = direct_clients[:2]
         
         # Setup room
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         
@@ -273,7 +273,7 @@ class TestPerformanceAndLoad:
         
         for i in range(num_games):
             helper = DirectGameTestHelper(f'Player{i}')
-            room_id = helper.create_room(min_stake=10)
+            room_id = helper.create_room(stake=10)
             helper.join_room(room_id)
             helpers.append(helper)
             room_ids.append(room_id)
@@ -292,7 +292,7 @@ class TestPerformanceAndLoad:
         alice = direct_clients[0]
         
         # Setup room
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         game = game_state_sh.get_game(room_id)
         game.phase = "drawing"
@@ -320,7 +320,7 @@ class TestReconnectionHandling:
         alice, bob, carol = direct_clients
         
         # Setup game with 3 players
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         carol.join_room(room_id)
@@ -344,7 +344,7 @@ class TestReconnectionHandling:
         alice, bob = direct_clients[:2]
         
         # Create room and add players
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         
@@ -374,7 +374,7 @@ class TestComplexGameScenarios:
         alice, bob, carol = direct_clients
         
         # 1. Room creation and joining
-        room_id = alice.create_room(min_stake=10)
+        room_id = alice.create_room(stake=10)
         alice.join_room(room_id)
         bob.join_room(room_id)
         carol.join_room(room_id)

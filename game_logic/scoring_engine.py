@@ -212,7 +212,7 @@ class ScoringEngine:
             })
 
     def _log_game_summary(self):
-        """Log game summary to global log file"""
+        """Log game summary to global log file and record in database"""
         try:
             from util.game_logging import log_game_summary
             log_game_summary(
@@ -225,6 +225,62 @@ class ScoringEngine:
         except ImportError:
             debug_log("Game logging module not available", None, self.game.room_id)
 
+        # Record game completion in database for each player
+        try:
+            from util.db import record_game_completion
+            
+            for player_id, player_data in self.game.players.items():
+                balance_before = self.game.player_balances_before_game.get(player_id, player_data['balance'])
+                balance_after = player_data['balance']
+                stake = player_data.get('stake', 0)
+                
+                # Calculate statistics for this player
+                originals_drawn = 1 if player_id in self.game.original_drawings else 0
+                copies_made = sum(1 for drawing_set in self.game.drawing_sets 
+                                for drawing in drawing_set['drawings'] 
+                                if drawing['type'] == 'copy' and drawing['player_id'] == player_id)
+                
+                votes_cast = sum(1 for votes in self.game.votes.values() 
+                               if player_id in votes)
+                
+                # Count correct votes (voted for original drawings)
+                correct_votes = 0
+                for set_index, votes_for_set in self.game.votes.items():
+                    if player_id in votes_for_set:
+                        drawing_set = self.game.drawing_sets[set_index]
+                        voted_drawing_id = votes_for_set[player_id]
+                        original_drawing_id = f"original_{drawing_set['original_id']}"
+                        if voted_drawing_id == original_drawing_id:
+                            correct_votes += 1
+                
+                # Calculate points earned (simplified - could be more detailed)
+                points_earned = max(0, balance_after - balance_before + stake)  # Net gain plus stake back
+                
+                record_game_completion(
+                    player_id=player_id,
+                    room_id=self.game.room_id,
+                    username=player_data['username'],
+                    balance_before=balance_before,
+                    balance_after=balance_after,
+                    stake=stake,
+                    points_earned=points_earned,
+                    originals_drawn=originals_drawn,
+                    copies_made=copies_made,
+                    votes_cast=votes_cast,
+                    correct_votes=correct_votes
+                )
+                
+                debug_log("Recorded game completion for player", player_id, self.game.room_id, {
+                    'balance_change': balance_after - balance_before,
+                    'originals_drawn': originals_drawn,
+                    'copies_made': copies_made,
+                    'votes_cast': votes_cast,
+                    'correct_votes': correct_votes
+                })
+                
+        except Exception as e:
+            debug_log("Failed to record game completion in database", None, self.game.room_id, 
+                      {'error': str(e)})
 
 def is_blank_image(base64_data):
     from PIL import Image

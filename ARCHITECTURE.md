@@ -43,7 +43,6 @@ The backend uses a modular architecture with specialized components for each asp
 
 #### Phase-Specific Modules
 - **Timer (`timer.py`)**: Manages countdown timers and phase transitions
-- **Betting Phase (`betting_phase.py`)**: Handles stake collection and validation
 - **Drawing Phase (`drawing_phase.py`)**: Manages original artwork submission
 - **Copying Phase (`copying_phase.py`)**: Handles copy assignments and submissions
 - **Voting Phase (`voting_phase.py`)**: Creates voting sets and processes votes
@@ -52,7 +51,7 @@ The backend uses a modular architecture with specialized components for each asp
 #### Socket Handler System (`socket_handlers/`)
 - **Connection Handlers**: Manage client connections and disconnections
 - **Room Handlers**: Handle room creation, joining, and leaving
-- **Game Handlers**: Process in-game actions like betting, drawing, voting
+- **Game Handlers**: Process in-game actions like drawing and voting
 - **Admin Handlers**: Administrative functions and debugging
 - **Centralized State**: Shared game state management across handlers
 
@@ -99,10 +98,6 @@ The frontend uses a modular architecture with clear separation of concerns:
 - Current phase tracking and timer management
 - Game data storage and retrieval
 
-**Betting Manager** (`betting-manager.js`)
-- Stake selection and bet placement
-- Betting interface management
-
 **Drawing Manager** (`drawing-manager.js`)
 - Original drawing phase coordination
 - Canvas integration and submission
@@ -148,11 +143,10 @@ The frontend uses an event-driven architecture where:
 The game progresses through distinct phases, each managed by specialized components:
 
 1. **Waiting Phase**: Room setup and player joining
-2. **Betting Phase**: Players wager tokens on their performance
-3. **Drawing Phase**: Original artwork creation
-4. **Copying Phase**: Viewing and recreating other players' art
-5. **Voting Phase**: Multiple rounds of original identification
-6. **Results Phase**: Score calculation and final standings
+2. **Drawing Phase**: Original artwork creation
+3**Copying Phase**: Viewing and recreating other players' art
+4**Voting Phase**: Multiple rounds of original identification
+5**Results Phase**: Score calculation and final standings
 
 ### State Synchronization
 

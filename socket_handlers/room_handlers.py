@@ -198,7 +198,7 @@ class RoomHandlers:
             # After deleting a room, ensure there's still a default $10 room available
             new_room_id = game_state_sh.ensure_default_room()
             if new_room_id:
-                debug_log("Created replacement default room after deletion", None, new_room_id, {'min_stake': 10})
+                debug_log("Created replacement default room after deletion", None, new_room_id)
         else:
             # Notify remaining players
             emit('players_updated', {

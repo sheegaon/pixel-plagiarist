@@ -11,7 +11,8 @@ class ConnectionHandlers:
     def __init__(self, socketio):
         self.socketio = socketio
     
-    def handle_connect(self):
+    @staticmethod
+    def handle_connect():
         """Handle new client connection"""
         # Send current room list to newly connected client
         rooms = get_room_info()
@@ -22,14 +23,15 @@ class ConnectionHandlers:
             try:
                 new_room_id = game_state_sh.ensure_default_room()
                 if new_room_id:
-                    debug_log("Created default room on client connect", None, new_room_id, {'min_stake': 10})
+                    debug_log("Created default room on client connect", None, new_room_id)
                     # Send updated room list with the new room
                     updated_rooms = get_room_info()
                     emit('room_list_updated', {'rooms': updated_rooms})
             except Exception as e:
                 debug_log("Failed to create default room on connect", None, None, {'error': str(e)})
 
-    def handle_disconnect(self):
+    @staticmethod
+    def handle_disconnect():
         """Handle player disconnect"""
         player_id = request.sid
 
@@ -49,7 +51,7 @@ class ConnectionHandlers:
                     # After deleting a room, ensure there's still a default $10 room available
                     new_room_id = game_state_sh.ensure_default_room()
                     if new_room_id:
-                        debug_log("Created replacement default room after disconnect deletion", None, new_room_id, {'min_stake': 10})
+                        debug_log("Created replacement default room after disconnect deletion", None, new_room_id)
                     
                     # Broadcast updated room list when room is deleted
                     broadcast_room_list()
@@ -63,7 +65,8 @@ class ConnectionHandlers:
                     # Broadcast updated room list when player count changes
                     broadcast_room_list()
 
-    def handle_request_room_list(self, data=None):
+    @staticmethod
+    def handle_request_room_list(data=None):
         """Handle request for current room list"""
         rooms = get_room_info()
         emit('room_list_updated', {'rooms': rooms})

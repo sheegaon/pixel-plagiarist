@@ -26,16 +26,15 @@ class DrawingPhase:
 
         self.game.phase = "drawing"
 
-        # Set default stakes for players who didn't bet
-        self.game.betting_phase.apply_default_stakes()
-
-        # Send individual prompts to each player
-        for player_id, prompt in self.game.player_prompts.items():
-            socketio.emit('phase_changed', {
-                'phase': 'drawing',
-                'prompt': prompt,
-                'timer': self.game.timer.get_drawing_timer_duration()
-            }, to=player_id)
+        # Apply stakes
+        for player in self.game.players.values():
+            if player['stake'] == 0:
+                player['stake'] = self.game.min_stake
+                player['balance'] -= self.game.min_stake
+                debug_log("Applied stake", player['id'], self.game.room_id, {
+                    'stake': player['stake'],
+                    'new_balance': player['balance']
+                })
 
         self.game.timer.start_phase_timer(
             socketio, 

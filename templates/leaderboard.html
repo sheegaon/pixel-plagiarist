@@ -35,13 +35,14 @@
                             <tr>
                                 <th>Rank</th>
                                 <th>Player</th>
-                                <th>Total Points</th>
+                                <th>Balance</th>
                                 <th>Games Played</th>
-                                <th>Avg Points/Game</th>
+                                <th>Avg Winnings</th>
                                 <th>Successful Originals</th>
                                 <th>Successful Copies</th>
                                 <th>Original Success Rate</th>
                                 <th>Copy Success Rate</th>
+                                <th>Vote Accuracy</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -55,13 +56,14 @@
                                     {% endif %}
                                 </td>
                                 <td class="username">{{ player.username }}</td>
-                                <td class="points">{{ player.total_points }}</td>
+                                <td class="points">${{ player.balance }}</td>
                                 <td>{{ player.games_played }}</td>
-                                <td>{{ player.avg_points_per_game }}</td>
+                                <td>${{ "%.1f"|format(player.avg_winnings_per_game) }}</td>
                                 <td>{{ player.successful_originals }}</td>
                                 <td>{{ player.successful_copies }}</td>
-                                <td>{{ player.original_success_rate }}%</td>
-                                <td>{{ player.copy_success_rate }}%</td>
+                                <td>{{ "%.1f"|format(player.original_success_rate) }}%</td>
+                                <td>{{ "%.1f"|format(player.copy_success_rate) }}%</td>
+                                <td>{{ "%.1f"|format(player.vote_accuracy) }}%</td>
                             </tr>
                             {% endfor %}
                         </tbody>

@@ -35,7 +35,6 @@ def setup_socket_handlers(socketio):
     socketio.on_event('leave_room', room_handlers.handle_leave_room)
     
     # Register gameplay handlers
-    socketio.on_event('place_bet', game_handlers.handle_place_bet)
     socketio.on_event('submit_original', game_handlers.handle_submit_original)
     socketio.on_event('submit_copy', game_handlers.handle_submit_copy)
     socketio.on_event('submit_vote', game_handlers.handle_submit_vote)

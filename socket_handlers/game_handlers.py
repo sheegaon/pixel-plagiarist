@@ -11,17 +11,6 @@ class GameHandlers:
     def __init__(self, socketio):
         self.socketio = socketio
     
-    def handle_place_bet(self, data):
-        """Handle betting"""
-        player_id = request.sid
-        stake = data.get('stake', 10)
-
-        room_id = game_state_sh.get_player_room(player_id)
-        if room_id:
-            game = game_state_sh.get_game(room_id)
-            if game:
-                game.betting_phase.place_bet(player_id, stake, self.socketio)
-
     def handle_submit_original(self, data):
         """Handle drawing submission"""
         player_id = request.sid

@@ -12,6 +12,7 @@ const GameConfig = {
     MIN_STAKE: 0,
     MAX_STAKE: 0,
     INITIAL_BALANCE: 0,
+    ENTRY_FEE: 0,
     BLANK_IMAGE_PENALTY: 0.0,
     NON_VOTING_PENALTY: 0.0,
 

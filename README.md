@@ -8,12 +8,11 @@ A multiplayer web-based drawing game where players create original artwork, copy
 
 ### How to Play
 
-1. **Join or Create a Room**: Enter a room code or create a room with a minimum betting stake
-2. **Place Your Bet**: Wager tokens on your ability to fool other players
-3. **Draw Original**: Create an artwork based on the given prompt
-4. **Copy Others**: Study and recreate other players' drawings
-5. **Vote**: Identify which drawings are originals in a series of voting rounds
-6. **Win Tokens**: Earn tokens for successful deception and accurate voting
+1. **Join or Create a Room**: Enter a room code or create a room with a specified betting stake
+2. **Draw Original**: Create an artwork based on the given prompt
+3. **Copy Others**: Study and recreate other players' drawings
+4. **Vote**: Identify which drawings are originals in a series of voting rounds
+5. **Win Tokens**: Earn tokens for successful deception and accurate voting
 
 ## Detailed Gameplay
 
@@ -21,10 +20,9 @@ A multiplayer web-based drawing game where players create original artwork, copy
 
 **Pixel Plagiarist** follows a structured 6-phase gameplay cycle:
 
-#### 1. Room Setup & Betting Phase
-- Players join rooms with configurable minimum stakes ($10, $25, or $100)
-- Each player receives a starting balance of $100
-- Players must wager at least the room's minimum stake to participate
+#### 1. Room Setup
+- Players join rooms with configurable stakes ($100, $250, or $1000)
+- Each player receives a starting balance of $1000
 - Stakes are collected into a prize pool distributed based on performance
 
 #### 2. Original Drawing Phase

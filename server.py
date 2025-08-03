@@ -28,6 +28,7 @@ from authlib.integrations.flask_client import OAuth
 # Import our modular components
 from util.config import CONSTANTS
 from util.logging_utils import setup_logging
+from util.db import initialize_database, get_leaderboard
 from socket_handlers import setup_socket_handlers
 from socket_handlers.game_state import game_state_sh
 
@@ -112,6 +113,15 @@ logger = setup_logging()
 
 # Set up Socket.IO event handlers
 setup_socket_handlers(socketio)
+
+# Initialize database on startup
+try:
+    initialize_database()
+    print("Database initialized successfully")
+except Exception as e:
+    print(f"Failed to initialize database: {e}")
+    # Continue running but log the error
+    pass
 
 
 @app.route('/')
@@ -216,118 +226,47 @@ def leaderboard():
     if 'user' not in session:
         return redirect(url_for('login'))
 
-    # Read leaderboard data from game logs
-    leaderboard_data = get_leaderboard_data()
+    # Get leaderboard data from database
+    leaderboard_data = get_leaderboard()
     return render_template('leaderboard.html',
                            user=session['user'],
                            leaderboard=leaderboard_data)
 
 
-def get_leaderboard_data():
-    """
-    Extract leaderboard data from game summary logs
+@app.route('/api/player/balance/<player_id>')
+def get_player_balance(player_id):
+    """Get current player balance from database"""
+    if 'user' not in session:
+        return {'error': 'Not authenticated'}, 401
     
-    Returns
-    -------
-    list
-        List of player statistics sorted by performance
-    """
-    import csv
-    import os
-    from collections import defaultdict
-
-    log_file = os.path.join(os.path.dirname(__file__), 'logs', 'game_summary.csv')
-    if not os.path.exists(log_file):
-        return []
-
-    player_stats = defaultdict(lambda: {
-        'username': '',
-        'games_played': 0,
-        'total_drawings': 0,
-        'successful_originals': 0,  # Originals that got votes
-        'successful_copies': 0,  # Copies that fooled voters
-        'correct_votes': 0,  # Votes that correctly identified originals
-        'total_votes_cast': 0,
-        'total_points': 0
-    })
-
     try:
-        with open(log_file, 'r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-
-            games_seen = set()
-            for row in reader:
-                game_key = f"{row['timestamp']}_{row['room_id']}"
-
-                # Track unique games per player
-                if game_key not in games_seen:
-                    games_seen.add(game_key)
-
-                # Original player stats
-                original_id = row['original_player_id']
-                original_username = row['original_player_username']
-                original_votes = int(row['original_votes'] or 0)
-
-                if original_id and original_username != 'Unknown':
-                    stats = player_stats[original_id]
-                    stats['username'] = original_username
-                    stats['total_drawings'] += 1
-                    if original_votes > 0:
-                        stats['successful_originals'] += 1
-                        stats['total_points'] += original_votes * 100
-
-                # Copier stats
-                for copier_col, votes_col in [
-                    ('first_copier_username', 'first_copy_votes'),
-                    ('second_copier_username', 'second_copy_votes')
-                ]:
-                    copier_username = row.get(copier_col, '')
-                    copy_votes = int(row.get(votes_col, 0) or 0)
-
-                    if copier_username and copier_username != '':
-                        # We don't have copier IDs in the log, so use username as key
-                        # This is not ideal but works for the leaderboard
-                        copier_key = f"username_{copier_username}"
-                        stats = player_stats[copier_key]
-                        stats['username'] = copier_username
-                        stats['total_drawings'] += 1
-                        if copy_votes > 0:
-                            stats['successful_copies'] += 1
-                            stats['total_points'] += copy_votes * 150
-
-            # Count games played per player (approximate)
-            for player_key in player_stats:
-                # Rough estimate: each player plays in about 1/3 of logged games
-                player_stats[player_key]['games_played'] = max(1, len(games_seen) // 3)
-
+        from util.db import get_player_stats
+        player_stats = get_player_stats(player_id)
+        if player_stats:
+            return {'balance': player_stats['balance']}
+        else:
+            return {'balance': CONSTANTS['INITIAL_BALANCE']}
     except Exception as e:
-        print(f"Error reading leaderboard data: {e}")
-        return []
+        logger.error(f"Error getting player balance: {e}")
+        return {'error': 'Database error'}, 500
 
-    # Convert to list and calculate derived stats
-    leaderboard_list = []
-    for player_id, stats in player_stats.items():
-        if stats['username']:  # Only include players with actual usernames
-            # Calculate success rates
-            original_success_rate = (stats['successful_originals'] / max(1, stats['total_drawings'])) * 100
-            copy_success_rate = (stats['successful_copies'] / max(1, stats['total_drawings'])) * 100
 
-            leaderboard_list.append({
-                'username': stats['username'],
-                'games_played': stats['games_played'],
-                'total_drawings': stats['total_drawings'],
-                'successful_originals': stats['successful_originals'],
-                'successful_copies': stats['successful_copies'],
-                'total_points': stats['total_points'],
-                'original_success_rate': round(original_success_rate, 1),
-                'copy_success_rate': round(copy_success_rate, 1),
-                'avg_points_per_game': round(stats['total_points'] / max(1, stats['games_played']), 1)
-            })
-
-    # Sort by total points (primary) and then by success rate
-    leaderboard_list.sort(key=lambda x: (x['total_points'], x['avg_points_per_game']), reverse=True)
-
-    return leaderboard_list[:50]  # Top 50 players
+@app.route('/api/player/stats/<player_id>')
+def get_player_stats_route(player_id):
+    """Get comprehensive player statistics"""
+    if 'user' not in session:
+        return {'error': 'Not authenticated'}, 401
+    
+    try:
+        from util.db import get_player_stats
+        stats = get_player_stats(player_id)
+        if stats:
+            return dict(stats)
+        else:
+            return {'error': 'Player not found'}, 404
+    except Exception as e:
+        logger.error(f"Error getting player stats: {e}")
+        return {'error': 'Database error'}, 500
 
 
 if __name__ == '__main__':

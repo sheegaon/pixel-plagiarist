@@ -3,7 +3,6 @@ class GameStateManager {
     constructor() {
         this.currentPhase = 'waiting';
         this.gameData = {};
-        this.roundData = {};
         this.timeRemaining = 0;
         this.timer = null;
     }
@@ -19,18 +18,6 @@ class GameStateManager {
 
     setGameData(data) {
         this.gameData = { ...this.gameData, ...data };
-    }
-
-    getGameData() {
-        return this.gameData;
-    }
-
-    setRoundData(data) {
-        this.roundData = { ...this.roundData, ...data };
-    }
-
-    getRoundData() {
-        return this.roundData;
     }
 
     startTimer(duration) {
@@ -73,7 +60,6 @@ class GameStateManager {
     reset() {
         this.currentPhase = 'waiting';
         this.gameData = {};
-        this.roundData = {};
         this.clearTimer();
         this.timeRemaining = 0;
     }
