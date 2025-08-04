@@ -5,15 +5,15 @@ class RoomManager {
         this.roomList = [];
     }
 
-    createRoomWithStake(minStake) {
-        if (!minStake || minStake <= 0) {
+    createRoomWithStake(stake) {
+        if (!stake || stake <= 0) {
             uiManager.showError('Please enter a valid minimum stake');
             return;
         }
         
         const username = this.getUsername();
         socketHandler.emit('create_room', {
-            min_stake: parseInt(minStake),
+            stake: parseInt(stake),
             username: username
         });
         uiManager.showSuccess('Creating room...');
@@ -71,7 +71,7 @@ class RoomManager {
                 <div class="room-info">
                     <span class="room-id">Room: ${room.room_id}</span>
                     <span class="room-players">${room.player_count}/${this.max_players} players</span>
-                    <span class="room-stake">Min Stake: $${room.min_stake}</span>
+                    <span class="room-stake">Room Level: ${room.room_level}</span>
                 </div>
             </div>
         `).join('');

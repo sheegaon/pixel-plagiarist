@@ -256,7 +256,7 @@ class TestDataValidation:
             # Should either reject or auto-correct to valid value
             if bob_player.get('has_bet') and not initial_bet_status:
                 # If bet was accepted, stake should be valid
-                assert bob_player['stake'] >= game.min_stake
+                assert bob_player['stake'] >= game.stake
                 assert bob_player['stake'] <= bob_player['balance'] + bob_player['stake']
                 break  # Only test one invalid stake to avoid complications
 

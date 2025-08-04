@@ -20,13 +20,13 @@ class RoomHandlers:
         """Handle room creation request"""
         username = data.get('username', 'Anonymous')
         player_id = request.sid
-        min_stake = data.get('min_stake', 10)
+        stake = data['stake']
 
         # Generate unique room code
         room_id = str(uuid.uuid4())[:8].upper()
 
         # Create new game
-        new_game = GameStateGL(room_id, min_stake)
+        new_game = GameStateGL(room_id, stake)
         game_state_sh.add_game(room_id, new_game)
 
         # Add player to game and room

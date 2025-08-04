@@ -3,6 +3,7 @@ import uuid
 from flask_socketio import emit
 from game_logic import GameStateGL
 from util.logging_utils import debug_log
+from util.config import CONSTANTS
 
 
 class GameStateSH:
@@ -43,23 +44,23 @@ class GameStateSH:
         return self.GAMES
     
     def ensure_default_room(self):
-        """Ensure there's always at least one $10 minimum room available"""
-        # Check if there's already a waiting $10 room
-        has_waiting_ten_dollar_room = False
+        """Ensure there's always at least one Bronze level room available"""
+        # Check if there's already a waiting Bronze room
+        has_waiting_bronze_room = False
 
         for room_id, game in self.GAMES.items():
-            if (game.min_stake == 10 and
+            if (game.stake == CONSTANTS['MIN_STAKE'] and
                     game.phase == "waiting" and
                     len(game.players) < game.max_players):
-                has_waiting_ten_dollar_room = True
+                has_waiting_bronze_room = True
                 break
 
-        if not has_waiting_ten_dollar_room:
-            # Create a new $10 room
+        if not has_waiting_bronze_room:
+            # Create a new Bronze room
             room_id = str(uuid.uuid4())[:8].upper()
-            new_game = GameStateGL(room_id, 10)
+            new_game = GameStateGL(room_id, CONSTANTS['MIN_STAKE'])
             self.GAMES[room_id] = new_game
-            debug_log("Created guaranteed $10 room", None, room_id, {'min_stake': 10})
+            debug_log("Created guaranteed Bronze room", None, room_id, {'stake': CONSTANTS['MIN_STAKE']})
             return room_id
 
         return None
@@ -113,7 +114,7 @@ def get_room_info(state=None):
             'room_id': room_id,
             'player_count': len(game.players),
             'max_players': game.max_players,
-            'min_stake': game.min_stake,
+            'room_level': game.room_level(),
             'phase': game.phase,
             'created_at': game.created_at.isoformat(),
             'players': player_details  # Add player details for AI filtering

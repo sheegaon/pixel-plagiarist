@@ -27,7 +27,7 @@ class BettingPhase:
         for player_id, prompt in self.game.player_prompts.items():
             socketio.emit('game_started', {
                 'prompt': prompt,
-                'min_stake': self.game.min_stake,
+                'min_stake': self.game.stake,
                 'phase': 'betting',
                 'timer': self.game.timer.get_betting_timer_duration()
             }, to=player_id)
@@ -44,7 +44,7 @@ class BettingPhase:
         debug_log("Player placing bet", player_id, self.game.room_id, {
             'stake': stake,
             'phase': self.game.phase,
-            'min_stake': self.game.min_stake
+            'min_stake': self.game.stake
         })
 
         # Validate phase
@@ -71,10 +71,10 @@ class BettingPhase:
             return False
 
         # Validate stake amount
-        if stake < self.game.min_stake:
+        if stake < self.game.stake:
             debug_log("Bet submission rejected - stake too low", player_id, self.game.room_id, {
                 'stake': stake,
-                'min_stake': self.game.min_stake
+                'min_stake': self.game.stake
             })
             return False
 
@@ -128,11 +128,11 @@ class BettingPhase:
         default_stakes_applied = 0
         for player in self.game.players.values():
             if player['stake'] == 0:
-                player['stake'] = self.game.min_stake
-                player['balance'] -= self.game.min_stake
+                player['stake'] = self.game.stake
+                player['balance'] -= self.game.stake
                 default_stakes_applied += 1
 
         debug_log("Applied default stakes to unbetting players", None, self.game.room_id,
-                  {'default_stakes_applied': default_stakes_applied, 'min_stake': self.game.min_stake})
+                  {'default_stakes_applied': default_stakes_applied, 'min_stake': self.game.stake})
         
         return default_stakes_applied

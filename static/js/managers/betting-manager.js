@@ -2,17 +2,17 @@
 class BettingManager {
     constructor() {
         this.currentStake = 0;
-        this.minStake = 0;
+        this.stake = 0;
         this.betPlaced = false;
     }
 
     initializeBetting(data) {
-        this.minStake = data.min_stake;
-        this.currentStake = this.minStake;
+        this.stake = data.stake;
+        this.currentStake = this.stake;
         this.betPlaced = false;
         
         this.setupStakeButtons();
-        this.updateStakeDisplay(this.minStake);
+        this.updateStakeDisplay(this.stake);
         
         const betButton = document.getElementById('betButton');
         if (betButton) {
@@ -38,7 +38,7 @@ class BettingManager {
         
         // Create buttons for each multiplier
         multipliers.forEach(multiplier => {
-            const stakeAmount = this.minStake * multiplier;
+            const stakeAmount = this.stake * multiplier;
             
             // Only show button if player can afford it
             if (stakeAmount <= playerManager.getBalance()) {
@@ -96,8 +96,8 @@ class BettingManager {
         }
 
         const stakeValue = parseInt(this.currentStake);
-        if (isNaN(stakeValue) || stakeValue < this.minStake) {
-            uiManager.showError(`Minimum stake is $${this.minStake}`);
+        if (isNaN(stakeValue) || stakeValue < this.stake) {
+            uiManager.showError(`Minimum stake is $${this.stake}`);
             return;
         }
 
@@ -126,7 +126,7 @@ class BettingManager {
 
     autoPlaceBet() {
         if (!this.betPlaced) {
-            if (this.currentStake >= this.minStake) {
+            if (this.currentStake >= this.stake) {
                 this.placeBet();
             }
         }
@@ -142,7 +142,7 @@ class BettingManager {
 
     reset() {
         this.currentStake = 0;
-        this.minStake = 0;
+        this.stake = 0;
         this.betPlaced = false;
         
         const betButton = document.getElementById('betButton');

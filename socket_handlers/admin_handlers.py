@@ -23,7 +23,7 @@ class AdminHandlers:
             debug_info['games'][room_id] = {
                 'players': len(game.players),
                 'phase': game.phase,
-                'min_stake': game.min_stake,
+                'min_stake': game.stake,
                 'created_at': game.created_at.isoformat()
             }
 

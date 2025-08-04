@@ -493,28 +493,31 @@
 }
 
 /* Different colors for different stake amounts */
+/* Bronze */
 .stake-btn:nth-child(1) {
-    background: #48bb78; /* Green for $10 */
+    background: #A46528;
 }
 
 .stake-btn:nth-child(1):hover {
-    background: #38a169;
+    background: #8B5622;
 }
 
+/* Silver */
 .stake-btn:nth-child(2) {
-    background: #ed8936; /* Orange for $25 */
+    background: #717171;
 }
 
 .stake-btn:nth-child(2):hover {
-    background: #dd6b20;
+    background: #606060;
 }
 
+/* Gold */
 .stake-btn:nth-child(3) {
-    background: #e53e3e; /* Red for $100 */
+    background: #877023;
 }
 
 .stake-btn:nth-child(3):hover {
-    background: #c53030;
+    background: #735F1E;
 }
 
 /* Login form styles */

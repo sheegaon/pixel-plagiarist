@@ -510,8 +510,8 @@ class TestConcurrentGames:
         game1 = game_state_sh.get_game(room1_id)
         game2 = game_state_sh.get_game(room2_id)
         
-        assert game1.min_stake == 10
-        assert game2.min_stake == 25
+        assert game1.stake == 10
+        assert game2.stake == 25
         
         # Add players to each game
         alice1.join_room(room1_id)

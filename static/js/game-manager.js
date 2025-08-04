@@ -23,8 +23,8 @@ class GameManager {
     }
 
     // Delegation methods for room management
-    createRoomWithStake(minStake) {
-        roomManager.createRoomWithStake(minStake);
+    createRoomWithStake(stake) {
+        roomManager.createRoomWithStake(stake);
     }
 
     joinRoomByCode() {

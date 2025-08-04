@@ -21,7 +21,7 @@ class GameStateGL:
     coordinating with specialized phase handlers for each game stage.
     """
     
-    def __init__(self, room_id, min_stake=CONSTANTS['MIN_STAKE']):
+    def __init__(self, room_id, stake=CONSTANTS['MIN_STAKE']):
         """
         Initialize a new game instance.
         
@@ -29,7 +29,7 @@ class GameStateGL:
         ----------
         room_id : str
             Unique identifier for the game room
-        min_stake : int, optional
+        stake : int, optional
             Minimum betting stake required for players, by default 10
         """
         self.room_id = room_id
@@ -37,7 +37,7 @@ class GameStateGL:
         self.phase = "waiting"  # waiting, betting, drawing, copying_viewing, copying, voting, results
         self.prompt = None
         self.player_prompts = {}
-        self.min_stake = min_stake
+        self.stake = stake
         self.max_players = CONSTANTS['MAX_PLAYERS']
         self.min_players = 3
 
@@ -108,9 +108,9 @@ class GameStateGL:
                       {'error': str(e), 'username': username})
             return False
 
-        if db_player['balance'] < self.min_stake + CONSTANTS['ENTRY_FEE']:
+        if db_player['balance'] < self.stake + CONSTANTS['ENTRY_FEE']:
             debug_log("Player balance too low to join game", player_id, self.room_id,
-                      {'balance': db_player['balance'], 'required': self.min_stake + CONSTANTS['ENTRY_FEE']})
+                      {'balance': db_player['balance'], 'required': self.stake + CONSTANTS['ENTRY_FEE']})
             return False
 
         # Store the player's balance before the game starts for tracking
@@ -215,12 +215,13 @@ class GameStateGL:
         for player_id, prompt in self.player_prompts.items():
             socketio.emit('game_started', {
                 'prompt': prompt,
-                'min_stake': self.min_stake,
+                'stake': self.stake,
                 'phase': 'drawing',
                 'timer': self.timer.get_drawing_timer_duration()
             }, to=player_id)
+            debug_log("Game started with prompt", player_id, self.room_id, {'prompt': prompt, 'stake': self.stake})
 
-        # Start betting phase
+        # Start drawing phase
         self.drawing_phase.start_phase(socketio)
 
         # Create a new default room since this one is now in progress
@@ -245,3 +246,12 @@ class GameStateGL:
                     'reason': 'Insufficient players',
                     'final_balance': {pid: self.players[pid]['balance'] for pid in self.players}
                 }, room=self.room_id)
+
+    def room_level(self):
+        if self.stake == CONSTANTS['MIN_STAKE']:
+            return 'Bronze'
+        elif self.stake == CONSTANTS['MAX_STAKE']:
+            return 'Gold'
+        else:
+            print(self.stake)
+            return 'Silver'

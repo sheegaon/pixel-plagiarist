@@ -52,9 +52,9 @@
                     <div class="room-section">
                         <h3>Create Room</h3>
                         <div class="stake-buttons">
-                            <button onclick="window.gameManager.createRoomWithStake(10)" class="stake-btn">Create $10 Minimum Room</button>
-                            <button onclick="window.gameManager.createRoomWithStake(25)" class="stake-btn">Create $25 Minimum Room</button>
-                            <button onclick="window.gameManager.createRoomWithStake(100)" class="stake-btn">Create $100 Minimum Room</button>
+                            <button onclick="window.gameManager.createRoomWithStake(100)" class="stake-btn">Create Bronze Level Room</button>
+                            <button onclick="window.gameManager.createRoomWithStake(250)" class="stake-btn">Create Silver Level Room</button>
+                            <button onclick="window.gameManager.createRoomWithStake(1000)" class="stake-btn">Create Gold Level Room</button>
                         </div>
                     </div>
                 </div>
@@ -186,7 +186,6 @@
     <script src="{{ url_for('static', filename='js/config.js') }}"></script>
     
     <!-- Load specialized managers first -->
-    <script src="{{ url_for('static', filename='js/managers/betting-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/managers/copying-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/managers/game-state-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/managers/drawing-manager.js') }}"></script>

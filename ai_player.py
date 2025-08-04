@@ -239,13 +239,10 @@ class PixelPlagiaristAI:
         @self.sio.on('game_started')
         def on_game_started(data):
             """Handle game start and betting phase."""
-            self.game_phase = "betting"
+            self.game_phase = "drawing"
             self.current_prompt = data['prompt']
-            min_stake = data['min_stake']
             print(f"🎮 {self.name}: Game started! Prompt: '{self.current_prompt}'")
-
-            # AI betting strategy (can be enhanced)
-            self.schedule_action(self.place_bet, min_stake)
+            self.schedule_action(self.draw_original)
 
         @self.sio.on('phase_changed')
         def on_phase_changed(data):

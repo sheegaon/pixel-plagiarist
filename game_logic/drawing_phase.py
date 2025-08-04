@@ -29,8 +29,8 @@ class DrawingPhase:
         # Apply stakes
         for player in self.game.players.values():
             if player['stake'] == 0:
-                player['stake'] = self.game.min_stake
-                player['balance'] -= self.game.min_stake
+                player['stake'] = self.game.stake
+                player['balance'] -= self.game.stake
                 debug_log("Applied stake", player['id'], self.game.room_id, {
                     'stake': player['stake'],
                     'new_balance': player['balance']
