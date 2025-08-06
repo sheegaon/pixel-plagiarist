@@ -282,6 +282,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Debug mode enabled. Use pixelPlagiarist.getDebugInfo() for debugging.');
             window.debug = () => window.pixelPlagiarist.getDebugInfo();
         }
+        else {
+            window.debug = (message) => console.log(`[DEBUG] ${message}`);
+        }
     } catch (error) {
         console.error('Critical initialization error:', error);
         document.body.innerHTML = `
