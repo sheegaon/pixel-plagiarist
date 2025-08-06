@@ -36,15 +36,13 @@ body {
     backdrop-filter: blur(10px);
 }
 
-.game-title {
-    font-size: 2.8rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: black;
-    background-clip: text;
-    margin-bottom: 15px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.game-logo {
+    display: block;
+    margin: 8px auto 8px auto;
+    width: 300px;
+    height: 90px;
+    background: url('/static/images/game-logo.svg') no-repeat center center;
+    background-size: contain;
 }
 
 /* Info items */

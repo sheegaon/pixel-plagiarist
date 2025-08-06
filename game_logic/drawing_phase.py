@@ -1,5 +1,5 @@
 # Drawing phase logic for Pixel Plagiarist
-from util.logging_utils import debug_log
+from util.logging_utils import debug_log, save_drawing
 
 
 class DrawingPhase:
@@ -23,18 +23,26 @@ class DrawingPhase:
         """Start the drawing phase using configured timer"""
         debug_log("Starting drawing phase", None, self.game.room_id,
                   {'timer': self.game.timer.get_drawing_timer_duration(), 'player_count': len(self.game.players)})
-
         self.game.phase = "drawing"
 
         # Apply stakes
         for player in self.game.players.values():
             if player['stake'] == 0:
-                player['stake'] = self.game.stake
-                player['balance'] -= self.game.stake
+                player['stake'] = self.game.prize_per_player
+                player['balance'] -= self.game.prize_per_player
                 debug_log("Applied stake", player['id'], self.game.room_id, {
                     'stake': player['stake'],
                     'new_balance': player['balance']
                 })
+
+        # Emit individual phase change events with prompts to each player
+        for player_id in self.game.players:
+            player_prompt = self.game.player_prompts.get(player_id, "Draw something creative!")
+            socketio.emit('phase_changed', {
+                'phase': 'drawing',
+                'prompt': player_prompt,
+                'timer': self.game.timer.get_drawing_timer_duration()
+            }, to=player_id)
 
         self.game.timer.start_phase_timer(
             socketio, 
@@ -64,12 +72,16 @@ class DrawingPhase:
             debug_log("Drawing submission rejected - already submitted", player_id, self.game.room_id)
             return False
 
+        # Save image to logs for debugging
+        image_path = save_drawing(drawing_data, player_id, self.game.room_id, 'original')
+
         self.game.original_drawings[player_id] = drawing_data
         self.game.players[player_id]['has_drawn_original'] = True
 
         debug_log("Original drawing submitted successfully", player_id, self.game.room_id, {
             'total_drawings': len(self.game.original_drawings),
-            'total_players': len(self.game.players)
+            'total_players': len(self.game.players),
+            'image_saved_to': image_path
         })
 
         socketio.emit('original_submitted', {
@@ -86,6 +98,15 @@ class DrawingPhase:
     def check_early_advance(self, socketio):
         """Check if all players have drawn and advance early if possible"""
         all_drawn = all(player.get('has_drawn_original', False) for player in self.game.players.values())
+        
+        players_status = {pid: player.get('has_drawn_original', False) for pid, player in self.game.players.items()}
+        debug_log("Checking early advance from drawing phase", None, self.game.room_id, {
+            'all_players_drawn': all_drawn,
+            'drawings_submitted': len(self.game.original_drawings),
+            'total_players': len(self.game.players),
+            'players_status': players_status
+        })
+        
         if all_drawn:
             debug_log("All players have drawn - advancing to copying phase early", None, self.game.room_id)
             # Cancel current timer

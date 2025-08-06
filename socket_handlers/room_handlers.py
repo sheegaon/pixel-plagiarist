@@ -7,7 +7,7 @@ from flask_socketio import emit, join_room, leave_room
 from game_logic import GameStateGL
 from util.config import TIMER_CONFIG
 from util.logging_utils import debug_log
-from .game_state import game_state_sh, broadcast_room_list
+from .game_state import GAME_STATE_SH, broadcast_room_list
 
 
 class RoomHandlers:
@@ -27,11 +27,11 @@ class RoomHandlers:
 
         # Create new game
         new_game = GameStateGL(room_id, stake)
-        game_state_sh.add_game(room_id, new_game)
+        GAME_STATE_SH.add_game(room_id, new_game)
 
         # Add player to game and room
         if new_game.add_player(player_id, username):
-            game_state_sh.add_player(player_id, room_id)
+            GAME_STATE_SH.add_player(player_id, room_id)
             join_room(room_id)
 
             emit('room_created', {
@@ -41,7 +41,7 @@ class RoomHandlers:
             })
 
             # Check if we should start countdown or game
-            game = game_state_sh.get_game(room_id)
+            game = GAME_STATE_SH.get_game(room_id)
             if len(game.players) >= game.min_players and game.phase == "waiting":
                 if len(game.players) >= game.max_players:
                     debug_log("Starting game immediately - max players reached", None, room_id,
@@ -72,8 +72,8 @@ class RoomHandlers:
         username = data.get('username', 'Anonymous')
         player_id = request.sid
 
-        if room_id in game_state_sh.GAMES:
-            game = game_state_sh.get_game(room_id)
+        if room_id in GAME_STATE_SH.GAMES:
+            game = GAME_STATE_SH.get_game(room_id)
 
             # First check if we can add the player
             if len(game.players) >= game.max_players:
@@ -84,7 +84,7 @@ class RoomHandlers:
                 return
 
             # Join the room first
-            game_state_sh.add_player(player_id, room_id)
+            GAME_STATE_SH.add_player(player_id, room_id)
             join_room(room_id)
 
             # Then add the player to the game
@@ -130,7 +130,7 @@ class RoomHandlers:
                 broadcast_room_list()
             else:
                 # If adding failed, remove from players dict
-                game_state_sh.remove_player(player_id)
+                GAME_STATE_SH.remove_player(player_id)
                 emit('join_room_error', {
                     'success': False,
                     'message': 'Failed to join room'
@@ -146,25 +146,25 @@ class RoomHandlers:
         """Handle player leaving a room"""
         player_id = request.sid
 
-        if not game_state_sh.get_player_room(player_id):
+        if not GAME_STATE_SH.get_player_room(player_id):
             emit('room_left', {
                 'success': False,
                 'message': 'You are not in a room'
             })
             return
 
-        room_id = game_state_sh.get_player_room(player_id)
+        room_id = GAME_STATE_SH.get_player_room(player_id)
 
-        if not game_state_sh.get_game(room_id):
+        if not GAME_STATE_SH.get_game(room_id):
             # Clean up orphaned player reference
-            game_state_sh.remove_player(player_id)
+            GAME_STATE_SH.remove_player(player_id)
             emit('room_left', {
                 'success': False,
                 'message': 'Room no longer exists'
             })
             return
 
-        game = game_state_sh.get_game(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
 
         # Only allow leaving during waiting or results phases
         if game.phase not in ["waiting", "results"]:
@@ -181,7 +181,7 @@ class RoomHandlers:
             debug_log("Player left room", player_id, room_id, {'username': username})
 
         # Remove from players tracking
-        game_state_sh.remove_player(player_id)
+        GAME_STATE_SH.remove_player(player_id)
         leave_room(room_id)
 
         # Notify the leaving player
@@ -192,11 +192,13 @@ class RoomHandlers:
 
         # Check if room is now empty and should be deleted
         if len(game.players) == 0:
-            debug_log("Room is empty, deleting", None, room_id)
-            game_state_sh.remove_game(room_id)
+            debug_log("Room is empty, deleting", None, room_id, {
+                'deletion_source': 'room_handler_leave_room'
+            })
+            GAME_STATE_SH.remove_game(room_id)
             
-            # After deleting a room, ensure there's still a default $10 room available
-            new_room_id = game_state_sh.ensure_default_room()
+            # After deleting a room, ensure there's still a default Bronze room available
+            new_room_id = GAME_STATE_SH.ensure_default_room()
             if new_room_id:
                 debug_log("Created replacement default room after deletion", None, new_room_id)
         else:

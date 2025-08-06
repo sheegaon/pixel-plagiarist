@@ -12,14 +12,15 @@ class VotingManager {
         this.selectedDrawingId = null;
         this.voteSubmitted = false;
         this.set_index = data.set_index;
+        this.drawings = data.drawings || [];
         
         uiManager.showView('voting');
         this.displayVotingInterface(data);
         
+        // Hide the submit button since votes are submitted immediately
         const submitButton = document.getElementById('submitVoteBtn');
         if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = 'Select a drawing first';
+            submitButton.style.display = 'none';
         }
         
         if (data.timer) {
@@ -65,12 +66,11 @@ class VotingManager {
                 <button class="flag-btn" onclick="socketHandler.flagImage('${drawing.id}', 'voting')">
                     🚩 Flag
                 </button>
-                ${observationOnly ? '<div class="observation-label">Observation Only</div>' : ''}
             `;
             
             if (!observationOnly) {
                 option.addEventListener('click', () => {
-                    this.selectDrawing(drawing.id, option);
+                    this.selectAndSubmitVote(drawing.id, option);
                 });
             }
             
@@ -78,7 +78,12 @@ class VotingManager {
         });
     }
 
-    selectDrawing(drawingId, element) {
+    selectAndSubmitVote(drawingId, element) {
+        if (this.voteSubmitted) {
+            uiManager.showError('Vote already submitted');
+            return;
+        }
+
         // Remove selection from all options
         document.querySelectorAll('.voting-option').forEach(opt => {
             opt.classList.remove('selected');
@@ -88,12 +93,8 @@ class VotingManager {
         element.classList.add('selected');
         this.selectedDrawingId = drawingId;
         
-        // Enable submit button
-        const submitButton = document.getElementById('submitVoteBtn');
-        if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Submit Vote';
-        }
+        // Submit vote immediately
+        this.submitVote();
     }
 
     submitVote() {
@@ -146,8 +147,7 @@ class VotingManager {
         
         const votingOptions = document.querySelectorAll('.voting-option');
         if (votingOptions[randomIndex]) {
-            this.selectDrawing(randomDrawing.id, votingOptions[randomIndex]);
-            this.submitVote();
+            this.selectAndSubmitVote(randomDrawing.id, votingOptions[randomIndex]);
         }
     }
 
@@ -178,20 +178,28 @@ class VotingManager {
             this.displayVotingOptions(data.drawings, true); // true = observation only
         }
         
+        // Hide the submit button entirely for excluded players
         const submitButton = document.getElementById('submitVoteBtn');
         if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = 'Cannot Vote';
+            submitButton.style.display = 'none';
         }
         
         // Start the timer to keep excluded players synchronized with voting phase
         if (data.timer) {
-            gameStateManager.startTimer(data.timer);
+            uiManager.startTimer('votingTimer', data.timer, () => {
+                // Timer callback for excluded players - just wait for next phase
+                console.log('Voting timer expired for excluded player');
+            });
         }
     }
 
     isVoteSubmitted() {
         return this.voteSubmitted;
+    }
+
+    selectDrawing(drawingId, element) {
+        // Keep this method for backwards compatibility but redirect to new method
+        this.selectAndSubmitVote(drawingId, element);
     }
 
     reset() {
@@ -201,10 +209,12 @@ class VotingManager {
         this.set_index = 0;
         this.drawings = [];
         
+        // Reset UI elements
         const submitButton = document.getElementById('submitVoteBtn');
         if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = 'Select a drawing first';
+            submitButton.disabled = false;
+            submitButton.textContent = 'Submit Vote';
+            submitButton.style.display = 'block';
         }
         
         const votingGrid = document.getElementById('votingGrid');
@@ -214,7 +224,10 @@ class VotingManager {
         
         const votingInstructions = document.getElementById('votingInstructions');
         if (votingInstructions) {
-            votingInstructions.innerHTML = '';
+            votingInstructions.innerHTML = `
+                <h3>Which drawing is the ORIGINAL?</h3>
+                <p>Set 1 of 1</p>
+            `;
         }
     }
 }

@@ -54,17 +54,30 @@ def initialize_database():
     Initialize the database and create tables if they don't exist.
     
     This function is called once on server startup to ensure the database
-    structure is properly set up.
+    structure is properly set up. If tables exist with old schema, they will be dropped.
     """
     try:
         with get_db() as conn:
             cursor = conn.cursor()
             
-            # Create players table
+            # Check if we need to recreate tables (if players table exists with old schema)
+            cursor.execute("PRAGMA table_info(players)")
+            columns = cursor.fetchall()
+            
+            # Check if 'id' column exists (old schema)
+            has_id_column = any(col[1] == 'id' for col in columns)
+            has_username_as_pk = any(col[1] == 'username' and col[5] == 1 for col in columns)
+            
+            if has_id_column and not has_username_as_pk:
+                debug_log("Dropping existing tables with old schema", None, None)
+                # Drop existing tables to recreate with new schema
+                cursor.execute("DROP TABLE IF EXISTS game_history")
+                cursor.execute("DROP TABLE IF EXISTS players")
+            
+            # Create players table with username as primary key
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS players (
-                    id TEXT PRIMARY KEY,
-                    username TEXT NOT NULL,
+                    username TEXT PRIMARY KEY,
                     email TEXT,
                     balance INTEGER DEFAULT 1000,
                     games_played INTEGER DEFAULT 0,
@@ -86,7 +99,6 @@ def initialize_database():
                 CREATE TABLE IF NOT EXISTS game_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     room_id TEXT NOT NULL,
-                    player_id TEXT NOT NULL,
                     username TEXT NOT NULL,
                     balance_before INTEGER NOT NULL,
                     balance_after INTEGER NOT NULL,
@@ -97,13 +109,12 @@ def initialize_database():
                     votes_cast INTEGER DEFAULT 0,
                     correct_votes INTEGER DEFAULT 0,
                     game_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (player_id) REFERENCES players (id)
+                    FOREIGN KEY (username) REFERENCES players (username)
                 )
             ''')
             
             # Create indexes for better performance
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_players_username ON players (username)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_game_history_player ON game_history (player_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_game_history_username ON game_history (username)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_game_history_room ON game_history (room_id)')
             
             debug_log("Database initialized successfully", None, None, {'db_path': DB_PATH})
@@ -113,16 +124,14 @@ def initialize_database():
         raise
 
 
-def get_or_create_player(player_id, username, email=None):
+def get_or_create_player(username, email=None):
     """
-    Get an existing player or create a new one.
+    Get an existing player or create a new one based on username.
     
     Parameters
     ----------
-    player_id : str
-        Unique player identifier
     username : str
-        Player's display name
+        Player's display name (now the primary key)
     email : str, optional
         Player's email address
         
@@ -135,19 +144,19 @@ def get_or_create_player(player_id, username, email=None):
         with get_db() as conn:
             cursor = conn.cursor()
             
-            # Try to get existing player
-            cursor.execute('SELECT * FROM players WHERE id = ?', (player_id,))
+            # Try to get existing player by username
+            cursor.execute('SELECT * FROM players WHERE username = ?', (username,))
             player = cursor.fetchone()
             
             if player:
-                # Update last played timestamp and username (in case it changed)
+                # Update last played timestamp
                 cursor.execute('''
                     UPDATE players 
-                    SET username = ?, last_played = CURRENT_TIMESTAMP 
-                    WHERE id = ?
-                ''', (username, player_id))
+                    SET last_played = CURRENT_TIMESTAMP 
+                    WHERE username = ?
+                ''', (username,))
                 
-                debug_log("Retrieved existing player", player_id, None, {
+                debug_log("Retrieved existing player", None, None, {
                     'username': username,
                     'balance': player['balance'],
                     'games_played': player['games_played']
@@ -157,15 +166,15 @@ def get_or_create_player(player_id, username, email=None):
             else:
                 # Create new player
                 cursor.execute('''
-                    INSERT INTO players (id, username, email, balance)
-                    VALUES (?, ?, ?, ?)
-                ''', (player_id, username, email, CONSTANTS['INITIAL_BALANCE']))
+                    INSERT INTO players (username, email, balance)
+                    VALUES (?, ?, ?)
+                ''', (username, email, CONSTANTS['INITIAL_BALANCE']))
                 
                 # Get the newly created player
-                cursor.execute('SELECT * FROM players WHERE id = ?', (player_id,))
+                cursor.execute('SELECT * FROM players WHERE username = ?', (username,))
                 player = cursor.fetchone()
                 
-                debug_log("Created new player", player_id, None, {
+                debug_log("Created new player", None, None, {
                     'username': username,
                     'initial_balance': CONSTANTS['INITIAL_BALANCE']
                 })
@@ -173,21 +182,55 @@ def get_or_create_player(player_id, username, email=None):
                 return dict(player)
                 
     except Exception as e:
-        debug_log("Failed to get or create player", player_id, None, {
+        debug_log("Failed to get or create player", None, None, {
             'error': str(e),
             'username': username
         })
         raise
 
 
-def update_player_balance(player_id, new_balance):
+def delete_player(username):
+    """
+    Delete a player from the database.
+
+    Parameters
+    ----------
+    username : str
+        Player's username
+
+    Returns
+    -------
+    bool
+        True if deletion was successful, False if player not found
+    """
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM players WHERE username = ?', (username,))
+
+            if cursor.rowcount > 0:
+                debug_log("Deleted player", None, None, {'username': username})
+                return True
+            else:
+                debug_log("Player not found for deletion", None, None, {'username': username})
+                return False
+
+    except Exception as e:
+        debug_log("Failed to delete player", None, None, {
+            'error': str(e),
+            'username': username
+        })
+        return False
+
+
+def update_player_balance(username, new_balance):
     """
     Update a player's balance in the database.
     
     Parameters
     ----------
-    player_id : str
-        Player identifier
+    username : str
+        Player's username
     new_balance : int
         New balance amount
         
@@ -202,42 +245,42 @@ def update_player_balance(player_id, new_balance):
             cursor.execute('''
                 UPDATE players 
                 SET balance = ?, last_played = CURRENT_TIMESTAMP 
-                WHERE id = ?
-            ''', (new_balance, player_id))
+                WHERE username = ?
+            ''', (new_balance, username))
             
             if cursor.rowcount > 0:
-                debug_log("Updated player balance", player_id, None, {
+                debug_log("Updated player balance", None, None, {
+                    'username': username,
                     'new_balance': new_balance
                 })
                 return True
             else:
-                debug_log("Player not found for balance update", player_id, None, {
+                debug_log("Player not found for balance update", None, None, {
+                    'username': username,
                     'new_balance': new_balance
                 })
                 return False
                 
     except Exception as e:
-        debug_log("Failed to update player balance", player_id, None, {
+        debug_log("Failed to update player balance", None, None, {
             'error': str(e),
+            'username': username,
             'new_balance': new_balance
         })
         return False
 
 
-def record_game_completion(player_id, room_id, username, balance_before, balance_after, 
-                           stake, points_earned=0, originals_drawn=0, copies_made=0,
-                           votes_cast=0, correct_votes=0):
+def record_game_completion(username, room_id, balance_before, balance_after, stake, points_earned=0, originals_drawn=0,
+                           copies_made=0, votes_cast=0, correct_votes=0):
     """
     Record a completed game for a player.
     
     Parameters
     ----------
-    player_id : str
-        Player identifier
-    room_id : str
-        Game room identifier
     username : str
         Player's username
+    room_id : str
+        Game room identifier
     balance_before : int
         Balance before the game
     balance_after : int
@@ -262,10 +305,10 @@ def record_game_completion(player_id, room_id, username, balance_before, balance
             # Record game history
             cursor.execute('''
                 INSERT INTO game_history 
-                (room_id, player_id, username, balance_before, balance_after, stake,
+                (room_id, username, balance_before, balance_after, stake,
                  points_earned, originals_drawn, copies_made, votes_cast, correct_votes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (room_id, player_id, username, balance_before, balance_after, stake,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (room_id, username, balance_before, balance_after, stake,
                   points_earned, originals_drawn, copies_made, votes_cast, correct_votes))
             
             # Update player statistics
@@ -285,14 +328,14 @@ def record_game_completion(player_id, room_id, username, balance_before, balance
                     correct_votes = correct_votes + ?,
                     balance = ?,
                     last_played = CURRENT_TIMESTAMP
-                WHERE id = ?
+                WHERE username = ?
             ''', (winnings, losses, 
                   1 if originals_drawn > 0 and points_earned > 0 else 0,  # Successful original (earned points)
                   1 if copies_made > 0 and points_earned > 0 else 0,      # Successful copy (earned points)
                   originals_drawn, copies_made, votes_cast, correct_votes,
-                  balance_after, player_id))
+                  balance_after, username))
             
-            debug_log("Recorded game completion", player_id, room_id, {
+            debug_log("Recorded game completion", None, room_id, {
                 'username': username,
                 'balance_change': balance_after - balance_before,
                 'points_earned': points_earned,
@@ -300,21 +343,21 @@ def record_game_completion(player_id, room_id, username, balance_before, balance
             })
             
     except Exception as e:
-        debug_log("Failed to record game completion", player_id, room_id, {
+        debug_log("Failed to record game completion", None, room_id, {
             'error': str(e),
             'username': username
         })
         raise
 
 
-def get_player_stats(player_id):
+def get_player_stats(username):
     """
     Get comprehensive statistics for a player.
     
     Parameters
     ----------
-    player_id : str
-        Player identifier
+    username : str
+        Player's username
         
     Returns
     -------
@@ -324,7 +367,7 @@ def get_player_stats(player_id):
     try:
         with get_db() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM players WHERE id = ?', (player_id,))
+            cursor.execute('SELECT * FROM players WHERE username = ?', (username,))
             player = cursor.fetchone()
             
             if player:
@@ -332,7 +375,10 @@ def get_player_stats(player_id):
             return None
             
     except Exception as e:
-        debug_log("Failed to get player stats", player_id, None, {'error': str(e)})
+        debug_log("Failed to get player stats", None, None, {
+            'error': str(e),
+            'username': username
+        })
         return None
 
 

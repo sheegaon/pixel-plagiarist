@@ -2,7 +2,6 @@
 const GameConfig = {
 
     JOINING_TIMER: 0,
-    BETTING_TIMER: 0,
     DRAWING_TIMER: 0,
     COPYING_TIMER: 0,
     VOTING_TIMER: 0,
@@ -13,12 +12,9 @@ const GameConfig = {
     MAX_STAKE: 0,
     INITIAL_BALANCE: 0,
     ENTRY_FEE: 0,
-    BLANK_IMAGE_PENALTY: 0.0,
-    NON_VOTING_PENALTY: 0.0,
 
     TIMERS: {
         JOINING: 0,
-        BETTING: 0,
         DRAWING: 0,
         COPYING: 0,
         VOTING: 0,
@@ -39,7 +35,6 @@ const GameConfig = {
     // Game phases
     PHASES: {
         WAITING: 'waiting',
-        BETTING: 'betting',
         DRAWING: 'drawing',
         COPYING: 'copying',
         VOTING: 'voting',

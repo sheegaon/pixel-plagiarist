@@ -1,5 +1,8 @@
 # Logging utilities for Pixel Plagiarist server
 import logging
+import os
+import base64
+from datetime import datetime
 from util.config import CONSTANTS
 
 
@@ -12,9 +15,6 @@ def setup_logging():
     logging.Logger
         Configured logger instance
     """
-    import os
-    from datetime import datetime
-    
     # Configure logging
     log_folder = os.path.join(os.getcwd(), 'logs')
     os.makedirs(log_folder, exist_ok=True)
@@ -23,6 +23,7 @@ def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
         handlers=[
             logging.FileHandler(log_file_path, encoding='utf-8'),
             logging.StreamHandler()
@@ -38,6 +39,62 @@ def setup_logging():
         logger.info("Debug mode disabled - Set DEBUG_MODE=true to enable detailed logging")
     
     return logger
+
+
+def save_drawing(image_data, player_id, room_id, image_type, target_id=None):
+    """
+    Save image data to logs/drawings/ folder for debugging purposes.
+    
+    Parameters
+    ----------
+    image_data : str
+        Base64 encoded image data
+    player_id : str
+        ID of the player who submitted the image
+    room_id : str
+        ID of the room where the image was submitted
+    image_type : str
+        Type of image ('original' or 'copy')
+    target_id : str, optional
+        For copies, the ID of the original artist being copied
+        
+    Returns
+    -------
+    str or None
+        Path to saved image file, or None if saving failed
+    """
+    try:
+        # Create images directory if it doesn't exist
+        images_folder = os.path.join(os.getcwd(), 'logs', 'drawings')
+        os.makedirs(images_folder, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]  # microseconds to milliseconds
+        if image_type == 'copy' and target_id:
+            filename = f"{timestamp}_{room_id}_{player_id}_copy_of_{target_id}.png"
+        else:
+            filename = f"{timestamp}_{room_id}_{player_id}_{image_type}.png"
+        
+        filepath = os.path.join(images_folder, filename)
+        
+        # Extract and save image data
+        if image_data and ',' in image_data:
+            # Remove data URL prefix
+            image_bytes = base64.b64decode(image_data.split(',')[1])
+            with open(filepath, 'wb') as f:
+                f.write(image_bytes)
+            return filepath
+        else:
+            debug_log("Invalid image data format - cannot save", player_id, room_id, {
+                'image_type': image_type, 'data_preview': str(image_data)[:100] if image_data else 'None'
+            })
+            return None
+            
+    except Exception as e:
+        debug_log("Failed to save image to logs", player_id, room_id, {
+            'error': str(e), 'image_type': image_type
+        })
+        return None
 
 
 def debug_log(message, player_id=None, room_id=None, extra_data=None):
@@ -56,12 +113,13 @@ def debug_log(message, player_id=None, room_id=None, extra_data=None):
         Additional data to include in the log
     """
     if CONSTANTS['debug_mode']:
-        log_parts = [message]
+        log_parts = []
 
-        if player_id:
-            log_parts.append(f"Player: {player_id}")
         if room_id:
             log_parts.append(f"Room: {room_id}")
+        if player_id:
+            log_parts.append(f"Player: {player_id}")
+        log_parts.append(message)
         if extra_data:
             log_parts.append(f"Data: {extra_data}")
 

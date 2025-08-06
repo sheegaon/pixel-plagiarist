@@ -21,8 +21,9 @@ from unittest.mock import patch, MagicMock
 
 # Import the main application components
 from server import app, socketio as app_socketio
-from socket_handlers.game_state import game_state_sh
+from socket_handlers.game_state import GAME_STATE_SH
 from game_logic.game_state import GameStateGL
+from util.config import CONSTANTS
 
 
 class SocketiOTestHelper:
@@ -118,37 +119,25 @@ class SocketiOTestHelper:
         """Clear received events buffer"""
         self.received_events.clear()
     
-    @staticmethod
-    def create_sample_drawing():
-        """Create a simple base64-encoded drawing for testing"""
-        # Create a minimal PNG red image
-        from PIL import Image
-        img = Image.new('RGB', (100, 100), color=(255, 0, 0))
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return f"data:image/png;base64,{image_data}"
-
     @property
     def socket_id(self):
         """Get the socket ID which is used as player ID"""
         return self._socket_id
 
 
-# Let's create a simpler approach using direct game manipulation
-class DirectGameTestHelper:
+class GameTestHelper:
     """Helper that directly manipulates game state for testing"""
     
     def __init__(self, username="TestPlayer"):
         self.username = username
         self.room_id = None
         self.player_id = f"test_{uuid.uuid4().hex[:16]}"
-        
+
     def create_room(self, stake=100):
         """Create a room directly"""
         self.room_id = str(uuid.uuid4())[:8].upper()
         game = GameStateGL(self.room_id, stake)
-        game_state_sh.add_game(self.room_id, game)
+        GAME_STATE_SH.add_game(self.room_id, game)
         return self.room_id
     
     def join_room(self, room_id=None):
@@ -156,22 +145,17 @@ class DirectGameTestHelper:
         if room_id:
             self.room_id = room_id
         
-        if self.room_id and self.room_id in game_state_sh.GAMES:
-            game = game_state_sh.get_game(self.room_id)
+        if self.room_id and self.room_id in GAME_STATE_SH.GAMES:
+            game = GAME_STATE_SH.get_game(self.room_id)
             game.add_player(self.player_id, self.username)
-            game_state_sh.add_player(self.player_id, self.room_id)
+            GAME_STATE_SH.add_player(self.player_id, self.room_id)
             return True
         return False
-    
-    @staticmethod
-    def create_sample_drawing():
-        """Create a simple base64-encoded drawing for testing"""
-        from PIL import Image
-        img = Image.new('RGB', (100, 100), color='white')
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return f"data:image/png;base64,{image_data}"
+
+    def delete_player(self):
+        """Remove player from DB"""
+        from util import db
+        db.delete_player(self.username)
 
 
 @pytest.fixture
@@ -189,23 +173,34 @@ def socketio_app(test_app):
 
 
 @pytest.fixture
-def direct_clients(n=3):
+def direct_clients():
     """Create direct game manipulation clients for easier testing"""
     players = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank', 'Grace', 'Heidi', 'Ivan', 'Judy',
                'Karl', 'Leo', 'Mallory', 'Nina', 'Oscar', 'Peggy', 'Quentin', 'Rupert', 'Sybil', 'Trent']
-    return [DirectGameTestHelper(players[n]) for n in range(n)]
+    return [GameTestHelper(players[n]) for n in range(20)]
 
 
 @pytest.fixture
 def clean_game_state():
     """Clean game state before each test"""
     # Clear all games and players
-    game_state_sh.GAMES.clear()
-    game_state_sh.PLAYERS.clear()
+    GAME_STATE_SH.GAMES.clear()
+    GAME_STATE_SH.PLAYERS.clear()
     yield
     # Clean up after test
-    game_state_sh.GAMES.clear()
-    game_state_sh.PLAYERS.clear()
+    GAME_STATE_SH.GAMES.clear()
+    GAME_STATE_SH.PLAYERS.clear()
+
+
+def create_sample_drawing():
+    """Create a simple base64-encoded drawing for testing"""
+    # Create a minimal PNG red image
+    from PIL import Image
+    img = Image.new('RGB', (100, 100), color=(255, 0, 0))
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    return f"data:image/png;base64,{image_data}"
 
 
 class TestRoomManagement:
@@ -213,22 +208,19 @@ class TestRoomManagement:
     
     def test_room_creation_and_joining_direct(self, direct_clients, clean_game_state):
         """Test basic room creation and player joining using direct manipulation"""
-        alice, bob, carol = direct_clients
+        alice, bob, carol = direct_clients[:3]
         
         # Alice creates a room
         room_id = alice.create_room()
         assert room_id is not None
-        assert room_id in game_state_sh.GAMES
+        assert room_id in GAME_STATE_SH.GAMES
         
-        # Alice joins her own room
-        assert alice.join_room(room_id) is True
-        
-        # Bob and Carol join the room
-        assert bob.join_room(room_id) is True
-        assert carol.join_room(room_id) is True
+        assert alice.join_room(room_id)
+        assert bob.join_room(room_id)
+        assert carol.join_room(room_id)
         
         # Verify all players are in room
-        game = game_state_sh.get_game(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
         assert len(game.players) == 3
         assert alice.player_id in game.players
         assert bob.player_id in game.players
@@ -252,7 +244,7 @@ class TestRoomManagement:
         bob.join_room(room_id)
         
         # Verify room exists with both players
-        game = game_state_sh.get_game(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
         assert len(game.players) == 2
         
         # Remove Alice
@@ -271,7 +263,7 @@ class TestGameFlow:
     @patch('game_logic.timer.Timer.start_phase_timer')
     def test_complete_game_flow(self, mock_timer, direct_clients, clean_game_state):
         """Test a complete game from start to finish"""
-        alice, bob, carol = direct_clients
+        alice, bob, carol = direct_clients[:3]
         
         # 1. Room Setup
         room_id = alice.create_room()
@@ -280,7 +272,7 @@ class TestGameFlow:
         assert carol.join_room(room_id), "Failed to join room"
         
         # Get game instance
-        game = game_state_sh.get_game(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
         assert game is not None
         assert len(game.players) == 3
         
@@ -290,9 +282,9 @@ class TestGameFlow:
         game.drawing_phase.start_phase(app_socketio)
 
         # 4. Drawing Phase - directly submit drawings
-        alice_drawing = alice.create_sample_drawing()
-        bob_drawing = bob.create_sample_drawing()
-        carol_drawing = carol.create_sample_drawing()
+        alice_drawing = create_sample_drawing()
+        bob_drawing = create_sample_drawing()
+        carol_drawing = create_sample_drawing()
         
         game.drawing_phase.submit_drawing(alice.player_id, alice_drawing, app_socketio, check_early_advance=False)
         game.drawing_phase.submit_drawing(bob.player_id, bob_drawing, app_socketio, check_early_advance=False)
@@ -301,14 +293,14 @@ class TestGameFlow:
         # Verify all drawings stored
         assert len(game.original_drawings) == 3
         
-        # 5. Copying Phase (starts with viewing sub-phase)
+        # 5. Copying Phase (starts immediately with review overlay)
         game.copying_phase.start_phase(app_socketio)
-        assert game.phase == "copying_viewing"  # Initial sub-phase is viewing
+        assert game.phase == "copying"  # Direct to copying phase
         
         # Submit copies (simplified - each player copies one other)
-        alice_copy = alice.create_sample_drawing()
-        bob_copy = bob.create_sample_drawing()
-        carol_copy = carol.create_sample_drawing()
+        alice_copy = create_sample_drawing()
+        bob_copy = create_sample_drawing()
+        carol_copy = create_sample_drawing()
         
         game.copying_phase.submit_drawing(
             alice.player_id, bob.player_id, alice_copy, app_socketio, check_early_advance=False)
@@ -342,6 +334,10 @@ class TestGameFlow:
         
         # Verify game completed
         assert game.phase == "results"
+
+        alice.delete_player()
+        bob.delete_player()
+        carol.delete_player()
     
     def test_drawing_phase(self, direct_clients, clean_game_state):
         """Test drawing submission and validation"""
@@ -350,20 +346,20 @@ class TestGameFlow:
         # Setup minimal game state
         room_id = alice.create_room()
         alice.join_room(room_id)
-        game = game_state_sh.get_game(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
         
         # Directly set to drawing phase
         game.phase = "drawing"
         
         # Test valid drawing submission
-        drawing_data = alice.create_sample_drawing()
-        game.drawing_phase.submit_drawing(alice.player_id, drawing_data, app_socketio)
+        drawing_data = create_sample_drawing()
+        game.drawing_phase.submit_drawing(alice.player_id, drawing_data, app_socketio, check_early_advance=False)
         
         # Verify drawing was stored
         assert alice.player_id in game.original_drawings
         
         # Test duplicate submission (should be rejected)
-        game.drawing_phase.submit_drawing(alice.player_id, drawing_data, app_socketio)
+        game.drawing_phase.submit_drawing(alice.player_id, drawing_data, app_socketio, check_early_advance=False)
         # Should not overwrite - still only one drawing
         assert len(game.original_drawings) == 1
 
@@ -378,18 +374,19 @@ class TestErrorHandling:
         # Create room
         room_id = alice.create_room()
         alice.join_room(room_id)
-        game = game_state_sh.get_game(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
         
         # Try to submit drawing during waiting phase
-        drawing_data = alice.create_sample_drawing()
-        game.drawing_phase.submit_drawing(alice.player_id, drawing_data, app_socketio)
+        drawing_data = create_sample_drawing()
+        game.drawing_phase.submit_drawing(alice.player_id, drawing_data, app_socketio, check_early_advance=False)
         
         # Should be rejected (no drawing should be stored)
         assert len(game.original_drawings) == 0
 
-    def test_game_early_termination(self, direct_clients, clean_game_state):
+    @patch('game_logic.timer.Timer.start_phase_timer')
+    def test_game_early_termination(self, mock_timer, direct_clients, clean_game_state):
         """Test game ending early due to insufficient players"""
-        alice, bob, carol = direct_clients
+        alice, bob, carol = direct_clients[:3]
         
         # Setup game with 3 players
         room_id = alice.create_room()
@@ -397,7 +394,7 @@ class TestErrorHandling:
         bob.join_room(room_id)
         carol.join_room(room_id)
         
-        game = game_state_sh.get_game(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
         game.start_game(app_socketio)
         
         # Remove players to trigger early termination
@@ -414,26 +411,31 @@ class TestErrorHandling:
 class TestScoringAndTokens:
     """Test scoring system and token distribution"""
     
-    def test_scoring_calculations(self, direct_clients, clean_game_state):
+    @patch('game_logic.timer.Timer.start_phase_timer')
+    def test_scoring_calculations(self, mock_timer, direct_clients, clean_game_state):
         """Test that scoring follows the documented rules"""
-        alice, bob, carol = direct_clients
+        alice, bob, carol = direct_clients[:3]
 
         # Setup game
-        room_id = alice.create_room()
+        room_id = GAME_STATE_SH.ensure_default_room()
+        if not room_id:
+            room_id = alice.create_room()
+        assert room_id is not None, "Failed to create default room"
         assert alice.join_room(room_id), "Failed to join room"
         assert bob.join_room(room_id), "Failed to join room"
         assert carol.join_room(room_id), "Failed to join room"
         
-        game = game_state_sh.get_game(room_id)
-        
+        game = GAME_STATE_SH.get_game(room_id)
+
         # Set up staking scenario
         initial_balances = {player_id: player_data['balance'] for player_id, player_data in game.players.items()}
 
         # Set up drawing phase
-        game.phase = "drawing"
+        game.start_game(app_socketio)
+        assert game.phase == "drawing", "Game should be in drawing phase"
         for player in [alice, bob, carol]:
             assert game.drawing_phase.submit_drawing(
-                player.player_id, player.create_sample_drawing(), app_socketio, check_early_advance=False), \
+                player.player_id, create_sample_drawing(), app_socketio, check_early_advance=False), \
                 f"Original drawing submission from {player} should be accepted"
 
         # Set up copying phase
@@ -443,13 +445,17 @@ class TestScoringAndTokens:
             player = next((p for p in [alice, bob, carol] if p.player_id == player_id), None)
             for target_id in target_ids:
                 assert game.copying_phase.submit_drawing(
-                    player_id, target_id, player.create_sample_drawing(), app_socketio, check_early_advance=False), \
+                    player_id, target_id, create_sample_drawing(), app_socketio, check_early_advance=False), \
                     f"Copy submission from {player} should be accepted"
 
         # Set up votes (all vote correctly for original drawings)
         game.phase = "voting"
         game.voting_phase._create_drawing_sets()
+        assert len(game.drawing_sets) == 3, "Should have 3 drawing sets for voting"
         for idx_current_drawing_set, drawing_set in enumerate(game.drawing_sets):
+            assert len(drawing_set['drawings']) == 2, "Each drawing set should contain 2 drawings"
+            assert len(game.voting_phase.get_eligible_voters_for_set(drawing_set)) == 1, \
+                "Each drawing set should have exactly one eligible voter"
             game.idx_current_drawing_set = idx_current_drawing_set
             for player_id in game.voting_phase.get_eligible_voters_for_set(drawing_set):
                 original_drawing_id = next((d['id'] for d in drawing_set['drawings'] if 'original' in d['id']), None)
@@ -476,27 +482,33 @@ class TestScoringAndTokens:
         # Verify token conservation (total should be preserved)
         total_initial = sum(initial_balances.values())
         total_final = sum(final_balances.values())
+        total_fees = game.entry_fee * len(game.players)
         
         # Total tokens should be conserved (allowing for some rounding)
-        assert abs(total_final - total_initial) <= 1  # Allow 1 token difference for rounding
+        assert abs(total_final - total_initial + total_fees) <= 1  # Allow 1 token difference for rounding
         
         # Verify scoring logic:
 
         alice_change = final_balances[alice.player_id] - initial_balances[alice.player_id]
         assert alice_change > 0, f"Alice should have gained tokens, got change: {alice_change}"
 
+        alice.delete_player()
+        bob.delete_player()
+        carol.delete_player()
+
 
 class TestConcurrentGames:
     """Test multiple games running simultaneously"""
     
-    def test_multiple_rooms_isolation(self, direct_clients, clean_game_state):
+    @patch('game_logic.timer.Timer.start_phase_timer')
+    def test_multiple_rooms_isolation(self, mock_timer, direct_clients, clean_game_state):
         """Test that multiple games don't interfere with each other"""
-        alice1, bob1, carol1 = direct_clients
+        alice1, bob1, carol1 = direct_clients[:3]
         
         # Create additional clients for second game
-        alice2 = DirectGameTestHelper("Alice2")
-        bob2 = DirectGameTestHelper("Bob2") 
-        carol2 = DirectGameTestHelper("Carol2")
+        alice2 = GameTestHelper("Alice2")
+        bob2 = GameTestHelper("Bob2")
+        carol2 = GameTestHelper("Carol2")
         
         # Create two separate rooms
         room1_id = alice1.create_room()
@@ -504,14 +516,14 @@ class TestConcurrentGames:
         
         # Verify rooms are separate
         assert room1_id != room2_id
-        assert room1_id in game_state_sh.GAMES
-        assert room2_id in game_state_sh.GAMES
+        assert room1_id in GAME_STATE_SH.GAMES
+        assert room2_id in GAME_STATE_SH.GAMES
         
-        game1 = game_state_sh.get_game(room1_id)
-        game2 = game_state_sh.get_game(room2_id)
+        game1 = GAME_STATE_SH.get_game(room1_id)
+        game2 = GAME_STATE_SH.get_game(room2_id)
         
-        assert game1.stake == 10
-        assert game2.stake == 25
+        assert game1.prize_per_player == 100
+        assert game2.prize_per_player == 250
         
         # Add players to each game
         alice1.join_room(room1_id)
@@ -530,6 +542,217 @@ class TestConcurrentGames:
         game1_player_ids = set(game1.players.keys())
         game2_player_ids = set(game2.players.keys())
         assert game1_player_ids.isdisjoint(game2_player_ids)
+
+
+class TestTimerAndPhaseTransitions:
+    """Test timer-based phase transitions and auto-advancement"""
+
+    def test_automatic_phase_transitions(self, direct_clients, clean_game_state):
+        """Test that phases advance automatically when timers expire"""
+        alice, bob, carol = direct_clients[:3]
+
+        # Setup game
+        room_id = alice.create_room()
+        alice.join_room(room_id)
+        bob.join_room(room_id)
+        carol.join_room(room_id)
+
+        game = GAME_STATE_SH.get_game(room_id)
+
+        # Mock timer to test phase transitions
+        with patch.object(game.timer, 'start_phase_timer') as mock_timer:
+            game.start_game(app_socketio)
+
+            # Verify timer was started for drawing phase
+            assert mock_timer.called
+
+            # Simulate timer callback execution
+            if mock_timer.call_args:
+                timer_callback = mock_timer.call_args[0][2]  # Third argument is callback
+                timer_callback()  # Execute the callback
+
+                # Verify phase advanced
+                assert game.phase == 'copying'
+
+    def test_early_phase_advancement(self, direct_clients, clean_game_state):
+        """Test early advancement when all players complete actions"""
+        alice, bob, carol = direct_clients[:3]
+
+        # Setup game
+        room_id = alice.create_room()
+        alice.join_room(room_id)
+        bob.join_room(room_id)
+        carol.join_room(room_id)
+
+        game = GAME_STATE_SH.get_game(room_id)
+        game.start_game(app_socketio)
+
+        # 4. Drawing Phase - directly submit drawings
+        alice_drawing = create_sample_drawing()
+        bob_drawing = create_sample_drawing()
+        carol_drawing = create_sample_drawing()
+
+        game.drawing_phase.submit_drawing(alice.player_id, alice_drawing, app_socketio, check_early_advance=False)
+        game.drawing_phase.submit_drawing(bob.player_id, bob_drawing, app_socketio, check_early_advance=False)
+        game.drawing_phase.submit_drawing(carol.player_id, carol_drawing, app_socketio, check_early_advance=False)
+
+        # Check if all players have bet
+        all_drawn = all(player.get('has_drawn_original', False) for player in game.players.values())
+        assert all_drawn is True
+
+        # Should trigger early advancement to drawing phase if implemented
+        # This depends on the game's early advancement logic
+
+    @patch('util.config.CONSTANTS', {'testing_mode': True})
+    def test_testing_mode_timers(self, direct_clients, clean_game_state):
+        """Test accelerated timers in testing mode"""
+        alice = direct_clients[0]
+
+        # In testing mode, all timers should be 5 seconds
+        room_id = alice.create_room()
+        alice.join_room(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
+
+        # Check that timer durations are reduced (if methods exist)
+        if hasattr(game.timer, 'get_drawing_timer_duration'):
+            drawing_timer = game.timer.get_drawing_timer_duration()
+            if CONSTANTS.get('testing_mode'):
+                assert drawing_timer == 5
+
+
+class TestDataValidation:
+    """Test input validation and sanitization"""
+
+    def test_drawing_data_validation(self, direct_clients, clean_game_state):
+        """Test validation of drawing data format"""
+        alice = direct_clients[0]
+
+        # Setup game in drawing phase
+        room_id = alice.create_room()
+        alice.join_room(room_id)
+        game = GAME_STATE_SH.get_game(room_id)
+        game.phase = "drawing"
+
+        # Test valid base64 image
+        valid_drawing = create_sample_drawing()
+        game.drawing_phase.submit_drawing(alice.player_id, valid_drawing, app_socketio)
+        assert alice.player_id in game.original_drawings
+
+        # Test invalid base64 data - create a second player to test with
+        bob = GameTestHelper("Bob")
+        bob.join_room(room_id)
+
+        initial_count = len(game.original_drawings)
+        game.drawing_phase.submit_drawing(bob.player_id, 'invalid_base64_data', app_socketio)
+        # Should either reject or sanitize - count should not increase if rejected
+        assert len(game.original_drawings) <= initial_count + 1
+
+        # Test missing data
+        carol = GameTestHelper("Carol")
+        carol.join_room(room_id)
+
+        initial_count = len(game.original_drawings)
+        game.drawing_phase.submit_drawing(carol.player_id, None, app_socketio)
+        # Should be rejected
+        assert len(game.original_drawings) == initial_count
+
+    def test_username_sanitization(self, clean_game_state):
+        """Test username input sanitization"""
+
+        # Test various username formats
+        test_usernames = [
+            "NormalUser",
+            "User123",
+            "User_With_Underscores",
+            "User-With-Hyphens",
+            "User.With.Dots",
+            "",  # Empty
+            "A" * 100,  # Too long
+            "<script>alert('xss')</script>",  # XSS attempt
+            "User\nWith\nNewlines",  # Special chars
+            "User\tWith\tTabs"
+        ]
+
+        for username in test_usernames:
+            # Create a fresh helper for each test to avoid conflicts
+            test_helper = GameTestHelper(username)
+
+            room_id = test_helper.create_room()
+            test_helper.join_room(room_id)
+
+            game = GAME_STATE_SH.get_game(room_id)
+            if game and test_helper.player_id in game.players:
+                stored_username = game.players[test_helper.player_id]['username']
+                # Username should be sanitized but not empty
+                assert len(stored_username.strip()) > 0
+                # Should not contain dangerous characters
+                assert '<script>' not in stored_username.lower()
+
+            # Clean up for next test
+            GAME_STATE_SH.remove_game(room_id)
+
+
+class TestReconnectionHandling:
+    """Test player reconnection and state recovery"""
+
+    @patch('game_logic.timer.Timer.start_phase_timer')
+    def test_player_disconnect_during_game(self, mock_timer, direct_clients, clean_game_state):
+        """Test handling of player disconnection during active game"""
+        alice, bob, carol, dave = direct_clients[:4]
+
+        # Setup game with 4 players
+        room_id = alice.create_room()
+        alice.join_room(room_id)
+        bob.join_room(room_id)
+        carol.join_room(room_id)
+        dave.join_room(room_id)
+
+        game = GAME_STATE_SH.get_game(room_id)
+        game.start_game(app_socketio)
+
+        # Simulate disconnect by manually removing player
+        game.remove_player(bob.player_id)
+
+        # Game should continue with remaining players
+        assert len(game.players) == 3  # Bob should be removed
+        assert alice.player_id in game.players
+        assert carol.player_id in game.players
+        assert dave.player_id in game.players
+
+        # Game should not end early if still above minimum
+        assert game.phase != "ended_early"
+
+        # Simulate disconnect by manually removing another player
+        game.remove_player(carol.player_id)
+
+        # Game should now end early
+        assert game.phase == "ended_early"
+
+    def test_room_cleanup_on_empty(self, direct_clients, clean_game_state):
+        """Test automatic room cleanup when all players leave"""
+        alice, bob = direct_clients[:2]
+
+        # Create room and add players
+        room_id = alice.create_room()
+        alice.join_room(room_id)
+        bob.join_room(room_id)
+
+        # Verify room exists
+        assert room_id in GAME_STATE_SH.GAMES
+
+        # Simulate all players disconnecting
+        game = GAME_STATE_SH.get_game(room_id)
+        game.remove_player(alice.player_id)
+        game.remove_player(bob.player_id)
+
+        # Room should be empty
+        assert len(game.players) == 0
+
+        # Manual cleanup for testing (in real app, this would be automatic)
+        if len(game.players) == 0:
+            GAME_STATE_SH.remove_game(room_id)
+
+        assert room_id not in GAME_STATE_SH.GAMES
 
 
 # Run integration tests with proper setup

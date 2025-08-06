@@ -23,7 +23,6 @@ AI Enhancement Opportunities
 Future improvements could include:
 - More sophisticated drawing algorithms (basic shapes, patterns)
 - Strategic voting based on drawing quality analysis
-- Adaptive betting strategies based on game state
 - Learning from previous games to improve performance
 - Computer vision analysis of other players' drawings
 """
@@ -191,13 +190,10 @@ class PixelPlagiaristAI:
         def on_room_list_updated(data):
             """Handle room list response from server."""
             self.available_rooms = data['rooms']
-            print(f"📋 {self.name}: Received {len(self.available_rooms)} available rooms: {self.available_rooms}")
 
             # Only try to join if we're actively looking for a room
             if self.looking_for_room:
                 self.schedule_action(self.try_join_available_room)
-            else:
-                print(f"📋 {self.name}: Not looking for a room")
 
         @self.sio.on('room_created')
         def on_room_created(data):
@@ -238,7 +234,7 @@ class PixelPlagiaristAI:
 
         @self.sio.on('game_started')
         def on_game_started(data):
-            """Handle game start and betting phase."""
+            """Handle game start."""
             self.game_phase = "drawing"
             self.current_prompt = data['prompt']
             print(f"🎮 {self.name}: Game started! Prompt: '{self.current_prompt}'")
@@ -277,8 +273,8 @@ class PixelPlagiaristAI:
         def on_game_results(data):
             """Handle game end and results."""
             print(f"🏆 {self.name}: Game finished!")
-            final_balance = data.get('final_balance', {})
-            final_tokens = final_balance.get(self.player_id, 0)
+            final_balances = data.get('final_balances', {})
+            final_tokens = final_balances.get(self.player_id, 0)
             print(f"💰 {self.name}: Final tokens: {final_tokens}")
 
             # Stay connected and look for new rooms to join
@@ -317,7 +313,6 @@ class PixelPlagiaristAI:
         """
         Request room list from server to find available rooms.
         """
-        print(f"🔍 {self.name}: Requesting available rooms from server...")
         self.looking_for_room = True  # Set flag to indicate active search
         self.sio.emit('request_room_list')
 
@@ -393,22 +388,11 @@ class PixelPlagiaristAI:
             self.schedule_action(self.find_existing_room, delay=10.0)
             return
 
-        # Debug: Print detailed room information
-        print(f"🔍 {self.name}: Analyzing {len(self.available_rooms)} available rooms:")
-        for i, room in enumerate(self.available_rooms):
-            player_names = [p['username'] for p in room.get('players', [])]
-            has_humans = has_human_players(room)
-            print(f"  Room {i + 1}: {room['room_id']} - Phase: {room['phase']}, "
-                  f"Players: {room['player_count']}/{room['max_players']}, "
-                  f"Has humans: {has_humans}, Players: {player_names}")
-
         # Filter rooms by suitability - must be waiting, have space, AND have human players
         suitable_rooms = [room for room in self.available_rooms
                           if (room['phase'] == 'waiting' and
                               room['player_count'] < room['max_players'] and
                               has_human_players(room))]
-
-        print(f"🎯 {self.name}: Found {len(suitable_rooms)} suitable rooms with human players")
 
         if suitable_rooms:
             # Prefer rooms that are closest to starting (more players)
@@ -424,22 +408,9 @@ class PixelPlagiaristAI:
                 'username': self.name
             })
         else:
-            print(f"⏳ {self.name}: No suitable rooms available (need rooms with human players)")
             self.looking_for_room = False  # Stop looking temporarily
             # Try again after a longer delay
             self.schedule_action(self.find_existing_room, delay=15.0)
-
-    def place_bet(self, min_stake):
-        """
-        Place a bet during the betting phase.
-        
-        Current strategy: Always bet the minimum.
-        Enhancement opportunity: Could implement more sophisticated betting
-        strategies based on confidence, previous performance, etc.
-        """
-        stake = min_stake  # Simple strategy: always bet minimum
-        print(f"💰 {self.name}: Placing bet of {stake} tokens")
-        self.sio.emit('place_bet', {'stake': stake})
 
     def draw_original(self):
         """
@@ -523,50 +494,116 @@ class PixelPlagiaristAI:
         str
             Base64-encoded PNG image data
         """
-        # Create blank canvas
-        width, height = 400, 400
-        image = Image.new('RGB', (width, height), 'white')
-        draw = ImageDraw.Draw(image)
+        try:
+            # Create blank canvas with white background
+            width, height = 400, 300
+            image = Image.new('RGB', (width, height), 'white')
+            draw = ImageDraw.Draw(image)
 
-        # Add some randomness to position and size
-        margin = 50
-        x1 = random.randint(margin, width - margin)
-        y1 = random.randint(margin, height - margin)
-        x2 = random.randint(margin, width - margin)
-        y2 = random.randint(margin, height - margin)
+            # Add some randomness to position and size
+            margin = 50
+            x1 = random.randint(margin, width - margin)
+            y1 = random.randint(margin, height - margin)
+            x2 = random.randint(margin, width - margin)
+            y2 = random.randint(margin, height - margin)
 
-        # Draw based on shape type
-        if shape == "X":
-            # Draw an X
-            draw.line([(margin, margin), (width - margin, height - margin)], fill='black', width=8)
-            draw.line([(margin, height - margin), (width - margin, margin)], fill='black', width=8)
-        elif shape == "O":
-            # Draw a circle
-            draw.ellipse([margin, margin, width - margin, height - margin], outline='black', width=8)
-        elif shape == "line":
-            # Draw a random line
-            draw.line([(x1, y1), (x2, y2)], fill='black', width=8)
-        elif shape == "circle":
-            # Draw a filled circle
-            draw.ellipse([margin, margin, width - margin, height - margin], fill='black')
-        elif shape == "square":
-            # Draw a filled square
-            draw.rectangle([margin, margin, width - margin, height - margin], fill='black')
-        elif shape == "triangle":
-            # Draw a triangle
-            draw.polygon(
-                [(width / 2, margin), (width - margin, height - margin), (margin, height - margin)], fill='black')
-        else:
-            # Default: simple X
-            draw.line([(margin, margin), (width - margin, height - margin)], fill='black', width=8)
-            draw.line([(margin, height - margin), (width - margin, margin)], fill='black', width=8)
+            # Use black color for all shapes to ensure visibility
+            color = 'black'
+            line_width = 8
 
-        # Convert to base64
-        buffer = io.BytesIO()
-        image.save(buffer, format='PNG')
-        image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            # Draw based on shape type
+            if shape == "X":
+                # Draw an X
+                draw.line([(margin, margin), (width - margin, height - margin)], fill=color, width=line_width)
+                draw.line([(margin, height - margin), (width - margin, margin)], fill=color, width=line_width)
+            elif shape == "O":
+                # Draw a circle outline
+                draw.ellipse([margin, margin, width - margin, height - margin], outline=color, width=line_width)
+            elif shape == "line":
+                # Draw a random line
+                draw.line([(x1, y1), (x2, y2)], fill=color, width=line_width)
+            elif shape == "circle":
+                # Draw a filled circle
+                circle_size = min(width, height) // 3
+                center_x, center_y = width // 2, height // 2
+                draw.ellipse([center_x - circle_size, center_y - circle_size, 
+                             center_x + circle_size, center_y + circle_size], fill=color)
+            elif shape == "square":
+                # Draw a filled square
+                square_size = min(width, height) // 3
+                center_x, center_y = width // 2, height // 2
+                draw.rectangle([center_x - square_size, center_y - square_size,
+                               center_x + square_size, center_y + square_size], fill=color)
+            elif shape == "triangle":
+                # Draw a triangle
+                center_x, center_y = width // 2, height // 2
+                size = min(width, height) // 3
+                draw.polygon([
+                    (center_x, center_y - size),  # top point
+                    (center_x - size, center_y + size),  # bottom left
+                    (center_x + size, center_y + size)   # bottom right
+                ], fill=color)
+            else:
+                # Default: simple X (guaranteed to be visible)
+                draw.line([(margin, margin), (width - margin, height - margin)], fill=color, width=line_width)
+                draw.line([(margin, height - margin), (width - margin, margin)], fill=color, width=line_width)
 
-        return f"data:image/png;base64,{image_data}"
+            # Convert to base64 with proper error handling
+            buffer = io.BytesIO()
+            image.save(buffer, format='PNG', optimize=False)  # Don't optimize to avoid issues
+            buffer.seek(0)
+            image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            # Verify the image data is valid before returning
+            if len(image_data) < 100:  # Too small to be a valid image
+                raise ValueError("Generated image data too small")
+
+            result = f"data:image/png;base64,{image_data}"
+            print(f"✅ {PixelPlagiaristAI.__name__}: Created {shape} drawing ({len(image_data)} bytes)")
+            return result
+            
+        except Exception as e:
+            print(f"⚠️ Error creating {shape} drawing: {e}")
+            # Return a guaranteed working fallback
+            return PixelPlagiaristAI.create_guaranteed_fallback()
+
+    @staticmethod
+    def create_guaranteed_fallback():
+        """
+        Create a guaranteed working fallback drawing.
+        This uses the most basic PIL operations to ensure it always works.
+        
+        Returns
+        -------
+        str
+            Base64-encoded PNG image data for a simple black square
+        """
+        try:
+            # Create minimal image with guaranteed visible content
+            width, height = 400, 300
+            image = Image.new('RGB', (width, height), 'white')
+            draw = ImageDraw.Draw(image)
+            
+            # Draw a simple black square in the center - guaranteed to be visible
+            center_x, center_y = width // 2, height // 2
+            size = 50
+            draw.rectangle([center_x - size, center_y - size, center_x + size, center_y + size],
+                           fill='black', outline='black')
+            
+            # Convert to base64
+            buffer = io.BytesIO()
+            image.save(buffer, format='PNG')
+            image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            result = f"data:image/png;base64,{image_data}"
+            print(f"✅ Fallback: Created guaranteed black square ({len(image_data)} bytes)")
+            return result
+            
+        except Exception as e:
+            print(f"❌ Even guaranteed fallback failed: {e}")
+            # Last resort: return a minimal valid base64 PNG with visible content
+            # This is a 1x1 black pixel PNG encoded in base64
+            return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg=="
 
     def connect_to_server(self):
         """Connect to the game server."""
@@ -612,7 +649,14 @@ class PixelPlagiaristAI:
 
 def is_ai_player(username):
     """Detect whether a username belongs to an AI player."""
-    return username.startswith('AI_') or 'Bot' in username or username.startswith('AI ') or username.endswith('_AI')
+    if not username:
+        return False
+    return (username.startswith('AI_') or 
+            'Bot' in username or 
+            username.startswith('AI ') or 
+            username.endswith('_AI') or
+            username.startswith('AI Player') or
+            username.startswith('TestBot'))
 
 
 def main():

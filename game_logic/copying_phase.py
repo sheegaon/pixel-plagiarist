@@ -1,14 +1,13 @@
 # Copying phase logic for Pixel Plagiarist
 import random
+from util.logging_utils import debug_log, save_drawing
 import time
-import threading
-from util.logging_utils import debug_log
 
 
 class CopyingPhase:
     """
     Handles all copying phase logic including copy assignments,
-    viewing periods, submissions, and phase transitions.
+    submissions, and phase transitions.
     """
     
     def __init__(self, game):
@@ -23,32 +22,33 @@ class CopyingPhase:
         self.game = game
         self.phase_started = False  # Prevent duplicate phase starts
         self.assignments_made = False  # Prevent duplicate assignments
+        self.phase_start_time = None  # Track when copying phase started
 
     def start_phase(self, socketio):
-        """Start the copying phase with 10-second viewing period"""
-        # Prevent duplicate phase starts
-        if self.phase_started:
+        """Start the copying phase with immediate review overlay"""
+        # Allow restarting for new games - only prevent duplicate calls within same game
+        if self.phase_started and self.game.phase == "copying":
             debug_log("Copying phase already started, skipping duplicate call", None, self.game.room_id)
             return
 
-        debug_log("Starting copying phase with viewing period", None, self.game.room_id,
+        debug_log("Starting copying phase", None, self.game.room_id,
                   {'timer': self.game.timer.get_copying_timer_duration(), 'player_count': len(self.game.players)})
 
-        self.game.phase = "copying_viewing"
+        self.game.phase = "copying"
         self.phase_started = True
+        
+        # Set phase start time for early advance checking
+        self.phase_start_time = time.time()
 
-        # Assign copying tasks - only once
+        # Assign copying tasks - only once per game
         if not self.assignments_made:
             self._assign_copying_tasks()
             self.assignments_made = True
 
-        # Send assignments to players for 10-second viewing
-        self._send_viewing_phase(socketio)
+        # Send assignments to players and start copying immediately
+        self._send_copying_phase(socketio)
 
-        # After 10 seconds, start actual copying phase
-        self._schedule_copying_start(socketio)
-
-        # Set overall copying timer (including viewing time)
+        # Set copying timer
         self.game.timer.start_phase_timer(
             socketio, 
             self.game.timer.get_copying_timer_duration(),
@@ -68,49 +68,23 @@ class CopyingPhase:
 
         # Clear previous assignments
         self.game.copy_assignments = {}
-        
-        # Create a list of all possible (copier, target) pairs
-        possible_assignments = []
-        for copier in player_ids:
-            for target in player_ids:
-                if copier != target and target in self.game.original_drawings:
-                    possible_assignments.append((copier, target))
-        
-        # Shuffle to randomize assignments
-        random.shuffle(possible_assignments)
-        
-        # Track assignments per player and globally
-        player_assignment_counts = {pid: 0 for pid in player_ids}
-        assigned_targets = set()
-        
-        # Assign copies ensuring no duplicates
-        for copier, target in possible_assignments:
-            # Skip if this player already has enough copies
-            if player_assignment_counts[copier] >= copies_per_player:
-                continue
-                
-            # Skip if this target is already assigned (prevents multiple players copying same original)
-            if target in assigned_targets:
-                continue
-                
-            # Make the assignment
-            if copier not in self.game.copy_assignments:
-                self.game.copy_assignments[copier] = []
-                self.game.players[copier]['copies_to_make'] = []
-                
-            self.game.copy_assignments[copier].append(target)
-            self.game.players[copier]['copies_to_make'].append(target)
-            player_assignment_counts[copier] += 1
-            assigned_targets.add(target)
 
+        for p, pid in enumerate(player_ids):
+            self.game.copy_assignments[pid] = []
+            for i in range(copies_per_player):
+                self.game.copy_assignments[pid].append(player_ids[(p + 1 + i) % num_players])
+            
+            # Set copies_to_make for each player so we can track progress properly
+            self.game.players[pid]['copies_to_make'] = self.game.copy_assignments[pid].copy()
+        
         # Log final assignments
         for player_id in player_ids:
             targets = self.game.copy_assignments.get(player_id, [])
             debug_log("Copying assignment created", player_id, self.game.room_id,
                       {'targets': targets, 'target_count': len(targets)})
 
-    def _send_viewing_phase(self, socketio):
-        """Send viewing phase data to players"""
+    def _send_copying_phase(self, socketio):
+        """Send copying phase data to players with first drawing for review"""
         for player_id, target_ids in self.game.copy_assignments.items():
             target_drawings = []
             for target_id in target_ids:
@@ -120,37 +94,18 @@ class CopyingPhase:
                         'drawing': self.game.original_drawings[target_id]
                     })
 
-            debug_log("Sending copying viewing phase to player", player_id, self.game.room_id,
+            debug_log("Sending copying phase to player", player_id, self.game.room_id,
                       {'target_count': len(target_drawings)})
 
-            socketio.emit('copying_viewing_phase', {
+            socketio.emit('copying_phase', {
                 'targets': target_drawings,
-                'viewing_duration': 10,  # 10 seconds viewing
-                'total_timer': self.game.timer.get_copying_timer_duration()
+                'timer': self.game.timer.get_copying_timer_duration()
             }, to=player_id)
 
         socketio.emit('phase_changed', {
-            'phase': 'copying_viewing',
-            'viewing_duration': 10,
+            'phase': 'copying',
             'timer': self.game.timer.get_copying_timer_duration()
         }, room=self.game.room_id)
-
-    def _schedule_copying_start(self, socketio):
-        """Schedule the start of actual copying after viewing period"""
-        def start_actual_copying():
-            time.sleep(10)
-            self.game.phase = "copying"
-            
-            debug_log("Viewing period ended - starting copying", None, self.game.room_id)
-            
-            # Hide drawings and allow copying to begin
-            socketio.emit('copying_phase_started', {
-                'phase': 'copying',
-                'remaining_time': self.game.timer.get_copying_timer_duration() - 10
-            }, room=self.game.room_id)
-
-        viewing_timer = threading.Thread(target=start_actual_copying)
-        viewing_timer.start()
 
     def submit_drawing(self, player_id, target_id, drawing_data, socketio, check_early_advance=True):
         """Accept and store a player's copied drawing submission."""
@@ -162,13 +117,17 @@ class CopyingPhase:
             if player_id not in self.game.copied_drawings:
                 self.game.copied_drawings[player_id] = {}
 
+            # Save image to logs for debugging
+            image_path = save_drawing(drawing_data, player_id, self.game.room_id, 'copy', target_id)
+
             self.game.copied_drawings[player_id][target_id] = drawing_data
             self.game.players[player_id]['completed_copies'] += 1
 
             debug_log("Copied drawing submitted successfully", player_id, self.game.room_id, {
                 'target_id': target_id,
                 'completed_copies': self.game.players[player_id]['completed_copies'],
-                'total_required': len(self.game.players[player_id]['copies_to_make'])
+                'total_required': len(self.game.players[player_id]['copies_to_make']),
+                'image_saved_to': image_path
             })
 
             socketio.emit('copy_submitted', {
@@ -190,12 +149,34 @@ class CopyingPhase:
 
     def check_early_advance(self, socketio):
         """Check if all players have completed copying and advance early if possible"""
-        all_copied = all(
-            player.get('completed_copies', 0) >= len(player.get('copies_to_make', []))
-            for player in self.game.players.values()
-        )
+        # Calculate completion status for each player
+        player_completion = {}
+        for player_id, player in self.game.players.items():
+            completed = player.get('completed_copies', 0)
+            required = len(player.get('copies_to_make', []))
+            player_completion[player_id] = {
+                'completed': completed,
+                'required': required,
+                'finished': completed >= required
+            }
+        
+        all_copied = all(status['finished'] for status in player_completion.values())
+        
+        debug_log("Checking early advance from copying phase", None, self.game.room_id, {
+            'all_players_completed': all_copied,
+            'player_completion_status': player_completion,
+            'phase_start_time_set': hasattr(self, 'phase_start_time')
+        })
+        
         if all_copied:
-            debug_log("All players have completed copying - advancing to voting phase", None, self.game.room_id)
+            # Add minimum time check to prevent rapid transitions
+            import time
+            current_time = time.time()
+            if not hasattr(self, 'phase_start_time'):
+                self.phase_start_time = current_time
+            
+            debug_log("All players have completed copying - advancing to voting phase early", None, self.game.room_id,
+                      {'time_elapsed': current_time - self.phase_start_time})
             # Cancel current timer
             self.game.timer.cancel_phase_timer()
             socketio.emit('early_phase_advance', {
@@ -204,4 +185,10 @@ class CopyingPhase:
             }, room=self.game.room_id)
             self.game.voting_phase.start_phase(socketio)
             return True
+
         return False
+
+    def reset_for_new_game(self):
+        """Reset flags for a new game"""
+        self.phase_started = False
+        self.assignments_made = False

@@ -49,7 +49,7 @@ class GameStateSH:
         has_waiting_bronze_room = False
 
         for room_id, game in self.GAMES.items():
-            if (game.stake == CONSTANTS['MIN_STAKE'] and
+            if (game.prize_per_player == CONSTANTS['MIN_STAKE'] and
                     game.phase == "waiting" and
                     len(game.players) < game.max_players):
                 has_waiting_bronze_room = True
@@ -76,16 +76,16 @@ class GameStateSH:
 
 
 # Global game state instance
-game_state_sh = GameStateSH()
+GAME_STATE_SH = GameStateSH()
 
 
-def get_room_info(state=None):
+def get_room_info(game_state_sh=GAME_STATE_SH):
     """
     Get information about all available rooms.
     
     Parameters
     ----------
-    state : GameState, optional
+    game_state_sh : GameState, optional
         Game state instance to use, defaults to global instance
         
     Returns
@@ -93,11 +93,8 @@ def get_room_info(state=None):
     list
         List of room information dictionaries
     """
-    if state is None:
-        state = game_state_sh
-        
     rooms = []
-    for room_id, game in state.get_all_games().items():
+    for room_id, game in game_state_sh.get_all_games().items():
         # Only include rooms in waiting phase
         if game.phase != "waiting":
             continue
@@ -126,12 +123,9 @@ def get_room_info(state=None):
     return rooms
 
 
-def broadcast_room_list(socketio=None, state=None):
+def broadcast_room_list(socketio=None, game_state_sh=GAME_STATE_SH):
     """Broadcast updated room list to all clients on home screen."""
-    if state is None:
-        state = game_state_sh
-        
-    rooms = get_room_info(state)
+    rooms = get_room_info(game_state_sh)
     if socketio:
         # Use the provided socketio instance when called from background threads
         socketio.emit('room_list_updated', {'rooms': rooms})

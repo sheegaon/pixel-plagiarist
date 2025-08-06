@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pixel Plagiarist</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🎨</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/icons/game-icon.svg') }}">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
@@ -13,9 +13,7 @@
 <body>
     <div class="container">
         <div class="game-header">
-            <h1 class="game-title">
-                🎨 Pixel Plagiarist
-            </h1>
+            <div class="game-logo"></div>
             <div class="game-info">
                 <div class="info-item" id="balanceInfo">Balance: -</div>
                 <div class="info-item hidden" id="roomInfo">Room: -</div>
@@ -59,7 +57,6 @@
                     </div>
                 </div>
 
-                <div id="errorDisplay" class="error-message" style="display: none;"></div>
             </div>
 
             <!-- Waiting Screen -->
@@ -116,7 +113,7 @@
                     <canvas id="copyingCanvas" width="400" height="300"></canvas>
                 </div>
 
-                <button onclick="window.gameManager.submitCurrentCopy()" id="submitCopyBtn" disabled>Submit Copy</button>
+                <button onclick="window.gameManager.submitCurrentCopy()" id="submitCopyBtn">Submit Copy</button>
                 <div class="timer" id="copyingTimer"></div>
             </div>
 
@@ -139,6 +136,10 @@
                 <div class="phase-indicator">Game Results</div>
                 <div class="results-grid" id="resultsGrid"></div>
             </div>
+
+            <!-- Error Display -->
+            <div id="errorDisplay" class="error-message" style="display: none;"></div>
+
         </div>
     </div>
 

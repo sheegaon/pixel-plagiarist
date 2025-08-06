@@ -52,7 +52,6 @@ class PixelPlagiarist {
                     // Also update the TIMERS object for convenience
                     const newTimers = {
                         JOINING: configData.JOINING_TIMER || GameConfig.TIMERS.JOINING,
-                        BETTING: configData.BETTING_TIMER || GameConfig.TIMERS.BETTING,
                         DRAWING: configData.DRAWING_TIMER || GameConfig.TIMERS.DRAWING,
                         COPYING: configData.COPYING_TIMER || GameConfig.TIMERS.COPYING,
                         VOTING: configData.VOTING_TIMER || GameConfig.TIMERS.VOTING,
@@ -172,7 +171,7 @@ class PixelPlagiarist {
         if (window.gameManager && window.gameManager.updateBalanceDisplay) {
             setTimeout(() => {
                 window.gameManager.updateBalanceDisplay();
-                debug(`Initial balance set to: $${GameConfig.INITIAL_BALANCE}`);
+                debug(`Initial balance set to: ${GameConfig.INITIAL_BALANCE} Pixel Pts`);
             }, 10);
         }
         

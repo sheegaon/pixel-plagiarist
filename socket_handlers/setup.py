@@ -3,7 +3,7 @@ from .connection_handlers import ConnectionHandlers
 from .room_handlers import RoomHandlers
 from .game_handlers import GameHandlers
 from .admin_handlers import AdminHandlers
-from .game_state import game_state_sh
+from .game_state import GAME_STATE_SH
 
 
 def setup_socket_handlers(socketio):
@@ -22,7 +22,7 @@ def setup_socket_handlers(socketio):
     admin_handlers = AdminHandlers(socketio)
     
     # Ensure default room exists
-    game_state_sh.ensure_default_room()
+    GAME_STATE_SH.ensure_default_room()
     
     # Register connection handlers
     socketio.on_event('connect', connection_handlers.handle_connect)

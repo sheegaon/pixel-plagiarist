@@ -8,7 +8,7 @@ This is the main entry point for the Pixel Plagiarist server.
 Debug Mode
 ----------
 Set TESTING_MODE=true as an environment variable to enable accelerated gameplay for testing:
-- All timers reduced to 5 seconds (countdown, betting, drawing, copying, voting)
+- All timers reduced to 5 seconds (countdown, drawing, copying, voting)
 - Faster game progression for development and testing purposes
 - Use 'heroku config:set TESTING_MODE=true' for Heroku deployments
 
@@ -30,7 +30,7 @@ from util.config import CONSTANTS
 from util.logging_utils import setup_logging
 from util.db import initialize_database, get_leaderboard
 from socket_handlers import setup_socket_handlers
-from socket_handlers.game_state import game_state_sh
+from socket_handlers.game_state import GAME_STATE_SH
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -233,15 +233,15 @@ def leaderboard():
                            leaderboard=leaderboard_data)
 
 
-@app.route('/api/player/balance/<player_id>')
-def get_player_balance(player_id):
+@app.route('/api/player/balance/<username>')
+def get_player_balance(username):
     """Get current player balance from database"""
     if 'user' not in session:
         return {'error': 'Not authenticated'}, 401
     
     try:
         from util.db import get_player_stats
-        player_stats = get_player_stats(player_id)
+        player_stats = get_player_stats(username)
         if player_stats:
             return {'balance': player_stats['balance']}
         else:
@@ -251,21 +251,47 @@ def get_player_balance(player_id):
         return {'error': 'Database error'}, 500
 
 
-@app.route('/api/player/stats/<player_id>')
-def get_player_stats_route(player_id):
+@app.route('/api/player/stats/<username>')
+def get_player_stats_route(username):
     """Get comprehensive player statistics"""
     if 'user' not in session:
         return {'error': 'Not authenticated'}, 401
     
     try:
         from util.db import get_player_stats
-        stats = get_player_stats(player_id)
+        stats = get_player_stats(username)
         if stats:
             return dict(stats)
         else:
             return {'error': 'Player not found'}, 404
     except Exception as e:
         logger.error(f"Error getting player stats: {e}")
+        return {'error': 'Database error'}, 500
+
+
+@app.route('/api/player/balance/<username>', methods=['POST'])
+def update_player_balance_route(username):
+    """Update player balance in database"""
+    if 'user' not in session:
+        return {'error': 'Not authenticated'}, 401
+    
+    try:
+        data = request.get_json()
+        new_balance = data.get('balance')
+        
+        if new_balance is None:
+            return {'error': 'Balance not provided'}, 400
+        
+        from util.db import update_player_balance
+        success = update_player_balance(username, new_balance)
+        
+        if success:
+            return {'success': True, 'balance': new_balance}
+        else:
+            return {'error': 'Failed to update balance'}, 500
+            
+    except Exception as e:
+        logger.error(f"Error updating player balance: {e}")
         return {'error': 'Database error'}, 500
 
 
@@ -283,8 +309,7 @@ if __name__ == '__main__':
 
     # Ensure there's always a default room available on startup
     try:
-        game_state_sh.ensure_default_room()
-        logger.info("Default $10 room created on server startup")
+        GAME_STATE_SH.ensure_default_room()
     except Exception as e:
         logger.error(f"Failed to create default room on startup: {e}")
 

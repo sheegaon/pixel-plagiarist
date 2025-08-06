@@ -15,6 +15,8 @@ BLANK_CANVAS = (
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAA/wMaogABCUUNmgAAAABJRU5ErkJggg==")
 
 
@@ -215,32 +217,14 @@ class VotingPhase:
             'phase': self.game.phase
         })
 
-        # Validate phase and player
-        if self.game.phase != "voting":
-            debug_log("Vote submission rejected - wrong phase", player_id, self.game.room_id, {
-                'current_phase': self.game.phase,
-                'drawing_id': drawing_id
-            })
-            return False
-            
-        if player_id not in self.game.players:
-            debug_log("Vote submission rejected - player not in game", player_id, self.game.room_id, {
-                'drawing_id': drawing_id
-            })
-            return False
-
-        if player_id not in self.get_eligible_voters_for_set(self.game.drawing_sets[self.game.idx_current_drawing_set]):
-            debug_log("Vote submission rejected - player not eligible to vote", player_id, self.game.room_id, {
+        # Comprehensive vote validation with detailed logging
+        validation_result = self._validate_vote(player_id, drawing_id)
+        if not validation_result['valid']:
+            debug_log("Vote submission rejected", player_id, self.game.room_id, {
                 'drawing_id': drawing_id,
-                'set_index': self.game.idx_current_drawing_set
-            })
-            return False
-
-        # Validate voting set index
-        if self.game.idx_current_drawing_set >= len(self.game.drawing_sets):
-            debug_log("Vote submission rejected - invalid set index", player_id, self.game.room_id, {
                 'set_index': self.game.idx_current_drawing_set,
-                'total_sets': len(self.game.drawing_sets)
+                'rejection_reason': validation_result['reason'],
+                'validation_details': validation_result['details']
             })
             return False
 
@@ -249,21 +233,14 @@ class VotingPhase:
         if set_index not in self.game.votes:
             self.game.votes[set_index] = {}
 
-        # Check if player already voted for this set
-        if player_id in self.game.votes[set_index]:
-            debug_log("Vote submission rejected - player already voted for this set", player_id, self.game.room_id, {
-                'drawing_id': drawing_id,
-                'set_index': set_index
-            })
-            return False
-
         self.game.votes[set_index][player_id] = drawing_id
         self.game.players[player_id]['votes_cast'] += 1
 
         debug_log("Vote recorded successfully", player_id, self.game.room_id, {
             'drawing_id': drawing_id,
             'set_index': set_index,
-            'total_votes_cast': self.game.players[player_id]['votes_cast']
+            'total_votes_cast': self.game.players[player_id]['votes_cast'],
+            'votes_in_set': len(self.game.votes[set_index])
         })
 
         socketio.emit('vote_cast', {
@@ -275,6 +252,102 @@ class VotingPhase:
         if check_early_advance:
             self.check_early_advance(socketio)
         return True
+
+    def _validate_vote(self, player_id, drawing_id):
+        """
+        Comprehensive vote validation with detailed logging.
+        
+        Returns
+        -------
+        dict
+            Validation result with 'valid', 'reason', and 'details' keys
+        """
+        # Check phase
+        if self.game.phase != "voting":
+            return {
+                'valid': False,
+                'reason': 'wrong_phase',
+                'details': {'current_phase': self.game.phase, 'expected_phase': 'voting'}
+            }
+            
+        # Check if player exists
+        if player_id not in self.game.players:
+            return {
+                'valid': False,
+                'reason': 'player_not_in_game',
+                'details': {'player_id': player_id}
+            }
+
+        # Check voting set index validity
+        if self.game.idx_current_drawing_set >= len(self.game.drawing_sets):
+            return {
+                'valid': False,
+                'reason': 'invalid_set_index',
+                'details': {
+                    'set_index': self.game.idx_current_drawing_set,
+                    'total_sets': len(self.game.drawing_sets)
+                }
+            }
+
+        current_set = self.game.drawing_sets[self.game.idx_current_drawing_set]
+        
+        # Check if player is eligible to vote (didn't draw or copy in this set)
+        eligible_voters = self.get_eligible_voters_for_set(current_set)
+        if player_id not in eligible_voters:
+            # Find out why they're not eligible
+            exclusion_reason = []
+            for drawing in current_set['drawings']:
+                if drawing['player_id'] == player_id:
+                    if drawing['type'] == 'original':
+                        exclusion_reason.append('drew_original')
+                    elif drawing['type'] == 'copy':
+                        exclusion_reason.append('made_copy')
+            
+            return {
+                'valid': False,
+                'reason': 'player_not_eligible',
+                'details': {
+                    'set_index': self.game.idx_current_drawing_set,
+                    'exclusion_reasons': exclusion_reason,
+                    'eligible_voters': len(eligible_voters)
+                }
+            }
+
+        # Check if player already voted for this set
+        set_index = self.game.idx_current_drawing_set
+        if set_index in self.game.votes and player_id in self.game.votes[set_index]:
+            return {
+                'valid': False,
+                'reason': 'already_voted',
+                'details': {
+                    'set_index': set_index,
+                    'previous_vote': self.game.votes[set_index][player_id]
+                }
+            }
+
+        # Check if drawing_id exists in current set
+        valid_drawing_ids = [drawing['id'] for drawing in current_set['drawings']]
+        if drawing_id not in valid_drawing_ids:
+            return {
+                'valid': False,
+                'reason': 'invalid_drawing_id',
+                'details': {
+                    'submitted_drawing_id': drawing_id,
+                    'valid_drawing_ids': valid_drawing_ids,
+                    'set_index': set_index
+                }
+            }
+
+        # All validations passed
+        return {
+            'valid': True,
+            'reason': None,
+            'details': {
+                'set_index': set_index,
+                'eligible_voters_count': len(eligible_voters),
+                'drawings_in_set': len(current_set['drawings'])
+            }
+        }
 
     def next_voting_set(self, socketio):
         """Move to next voting set"""

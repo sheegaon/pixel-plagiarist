@@ -29,7 +29,6 @@ def get_timer_config():
     dict
         Dictionary containing timer values:
         - joining: Time to wait for more players to join before starting
-        - betting: Time allowed for placing bets
         - drawing: Time allowed for drawing original artwork
         - copying: Time allowed for copying other players' drawings
         - voting: Time allowed per voting round
@@ -39,7 +38,6 @@ def get_timer_config():
         print("🧪 TESTING MODE ENABLED - All timers set to 2 seconds")
         return {
             'joining': 2,
-            'betting': 2,
             'drawing': 2,
             'copying': 2,
             'voting': 2,
@@ -48,7 +46,6 @@ def get_timer_config():
 
     return {
         'joining': CONFIG['JOINING_TIMER'],
-        'betting': CONFIG['BETTING_TIMER'],
         'drawing': CONFIG['DRAWING_TIMER'],
         'copying': CONFIG['COPYING_TIMER'],
         'voting': CONFIG['VOTING_TIMER'],

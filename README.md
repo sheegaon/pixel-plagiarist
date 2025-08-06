@@ -8,11 +8,11 @@ A multiplayer web-based drawing game where players create original artwork, copy
 
 ### How to Play
 
-1. **Join or Create a Room**: Enter a room code or create a room with a specified betting stake
+1. **Join or Create a Room**: Enter a room code or create a room with a specified prize pool level
 2. **Draw Original**: Create an artwork based on the given prompt
 3. **Copy Others**: Study and recreate other players' drawings
 4. **Vote**: Identify which drawings are originals in a series of voting rounds
-5. **Win Tokens**: Earn tokens for successful deception and accurate voting
+5. **Win Tokens**: Earn _Pixel Point_ tokens for successful deception and accurate voting
 
 ## Detailed Gameplay
 
@@ -21,9 +21,10 @@ A multiplayer web-based drawing game where players create original artwork, copy
 **Pixel Plagiarist** follows a structured 6-phase gameplay cycle:
 
 #### 1. Room Setup
-- Players join rooms with configurable stakes ($100, $250, or $1000)
-- Each player receives a starting balance of $1000
+- Each player receives a starting balance of 1000 Pixel Points
+- Players join rooms with configurable stakes (100, 250, or 1000 Pixel Points)
 - Stakes are collected into a prize pool distributed based on performance
+- An additional entry fee is required to join the game, which does not contribute to the prize pool
 
 #### 2. Original Drawing Phase
 - Each player receives a unique drawing prompt (e.g., "Cat wearing a hat", "Flying book")
@@ -32,13 +33,13 @@ A multiplayer web-based drawing game where players create original artwork, copy
 - Auto-submission occurs if time expires to prevent game stalls
 
 #### 3. Copying Assignment & Viewing Phase
-- System randomly assigns each player 1-2 other players' drawings to copy
+- System randomly assigns each player 1-2 other players' original drawings to copy
 - Players are shown their assigned drawings for a brief viewing period
 
 #### 4. Copying Phase
 - Players recreate their assigned drawings from memory
 - "View Again" button allows 5-second re-examination of original
-- Goal: Make copies so accurate they're indistinguishable from originals
+- Goal: Make copies which will fool other players into thinking they are originals
 - Multiple copying rounds if assigned multiple targets
 
 #### 5. Voting Phase
@@ -65,9 +66,7 @@ The scoring system rewards both artistic deception and detective skills:
 
 #### **Token Distribution**
 - The prize pool (sum of all stakes) is distributed proportionally based on scores
-- Prize pool contributions are taken equally from all participating artists in the set
-- Excess stakes are returned to players
-- Disconnected or inactive players forfeit a portion of their excess stakes, which are redistributed to active players
+- Each drawing set is evaluated independently, allowing for multiple winners
 
 #### **Strategic Considerations**
 - **Copy Quality**: Better copies fool more voters but are harder to create
@@ -113,7 +112,6 @@ The scoring system rewards both artistic deception and detective skills:
 ### Gameplay
 - **Real-time multiplayer**: Up to 12 players per room
 - **Dynamic prompts**: Varied drawing challenges from curated prompt list
-- **Betting system**: Token-based wagering adds strategic depth
 - **Multi-phase voting**: Multiple rounds ensure balanced scoring
 - **Live drawing**: HTML5 Canvas with brush and eraser tools
 
@@ -185,7 +183,7 @@ python ai_player.py --count 3
 Modify `util/config.json` to adjust:
 - Timer durations for each phase
 - Min/max number of players per room
-- Betting stakes and token distribution rules
+- Token distribution rules
 
 ## Project Structure
 ```

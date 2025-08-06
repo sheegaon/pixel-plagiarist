@@ -88,7 +88,6 @@ heroku open
 | `SECRET_KEY` | **Required** - Flask session security | `a1b2c3d4e5f6...` |
 | `TESTING_MODE` | Enable testing mode (5-second timers) | `true` / `false`  |
 | `COUNTDOWN_TIMER` | Seconds to wait for more players | `20` (default)    |
-| `BETTING_TIMER` | Seconds for betting phase | `10` (default)    |
 | `DRAWING_TIMER` | Seconds for drawing phase | `60` (default)    |
 | `COPYING_TIMER` | Seconds for copying phase | `60` (default)    |
 | `VOTING_TIMER` | Seconds per voting round | `30` (default)    |
@@ -109,7 +108,6 @@ heroku config:set TESTING_MODE=false
 
 **What Testing Mode Does:**
 - **Countdown Timer**: 5 seconds (instead of 20) to wait for more players
-- **Betting Phase**: 5 seconds (instead of 10) for placing bets
 - **Drawing Phase**: 5 seconds (instead of 60) for creating original drawings
 - **Copying Phase**: 5 seconds (instead of 60) for copying other drawings
 - **Voting Rounds**: 5 seconds (instead of 10) per voting set

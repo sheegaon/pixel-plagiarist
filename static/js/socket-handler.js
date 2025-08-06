@@ -90,12 +90,8 @@ class SocketHandler {
         }));
 
         // Drawing and copying events - delegate to GameManager
-        this.socket.on('copying_assignment', this.registerHandler('copying_assignment', (data) => {
+        this.socket.on('copying_phase', this.registerHandler('copying_phase', (data) => {
             if (window.gameManager) window.gameManager.handleCopyingAssignment(data);
-        }));
-
-        this.socket.on('copying_viewing_phase', this.registerHandler('copying_viewing_phase', (data) => {
-            if (window.gameManager) window.gameManager.handleCopyingViewingPhase(data);
         }));
 
         this.socket.on('copying_phase_started', this.registerHandler('copying_phase_started', (data) => {
@@ -108,7 +104,12 @@ class SocketHandler {
         }));
 
         this.socket.on('copy_submitted', this.registerHandler('copy_submitted', (data) => {
-            uiManager.showMessage(`Copy ${data.completed} of ${data.total} submitted!`, 'success');
+            console.log(`🎨 Game Progress: Copy ${data.completed}/${data.total} submitted by player`);
+            
+            // Log when all copies are done for this player
+            if (data.completed === data.total) {
+                console.log(`✅ Player completed all ${data.total} copies`);
+            }
         }));
 
         // Voting events - delegate to GameManager
@@ -118,6 +119,11 @@ class SocketHandler {
 
         this.socket.on('voting_round_excluded', this.registerHandler('voting_round_excluded', (data) => {
             if (window.gameManager) window.gameManager.handleVotingRoundExcluded(data);
+        }));
+
+        this.socket.on('vote_cast', this.registerHandler('vote_cast', (data) => {
+            // Handle vote cast confirmation - this helps track voting progress
+            console.log(`🗳️ Game Progress: Vote cast by player for set ${data.set_index + 1}`);
         }));
 
         // Game results - delegate to GameManager
@@ -141,6 +147,7 @@ class SocketHandler {
 
         // System events
         this.socket.on('early_phase_advance', this.registerHandler('early_phase_advance', (data) => {
+            console.log(`⚡ Game Progress: Phase advancing early - ${data.reason}`);
             uiManager.showMessage(`Phase advancing early: ${data.reason}`, 'info');
         }));
 

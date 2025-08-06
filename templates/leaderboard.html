@@ -35,7 +35,7 @@
                             <tr>
                                 <th>Rank</th>
                                 <th>Player</th>
-                                <th>Balance</th>
+                                <th>Pixel Points</th>
                                 <th>Games Played</th>
                                 <th>Avg Winnings</th>
                                 <th>Successful Originals</th>
@@ -56,9 +56,9 @@
                                     {% endif %}
                                 </td>
                                 <td class="username">{{ player.username }}</td>
-                                <td class="points">${{ player.balance }}</td>
+                                <td class="points">{{ player.balance|round|int }}</td>
                                 <td>{{ player.games_played }}</td>
-                                <td>${{ "%.1f"|format(player.avg_winnings_per_game) }}</td>
+                                <td>${{ "%.0f"|format(player.avg_winnings_per_game) }}</td>
                                 <td>{{ player.successful_originals }}</td>
                                 <td>{{ player.successful_copies }}</td>
                                 <td>{{ "%.1f"|format(player.original_success_rate) }}%</td>

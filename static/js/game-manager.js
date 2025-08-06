@@ -111,16 +111,6 @@ class GameManager {
         if (promptText) {
             promptText.textContent = data.prompt;
         }
-        
-        drawingManager.initializeDrawing(data);
-
-        // Start drawing timer with auto-submit callback
-        uiManager.startTimer('drawingTimer', data.timer, () => {
-            if (gameStateManager.getPhase() === GameConfig.PHASES.DRAWING) {
-                drawingManager.autoSubmitDrawing();
-                uiManager.showError('Time up! Drawing submitted automatically.');
-            }
-        });
     }
 
     handlePhaseChanged(data) {
@@ -133,7 +123,20 @@ class GameManager {
             uiManager.startTimer('drawingTimer', data.timer, () => {
                 if (gameStateManager.getPhase() === GameConfig.PHASES.DRAWING) {
                     drawingManager.autoSubmitDrawing();
-                    uiManager.showError('Time up! Drawing submitted automatically.');
+                    uiManager.showMessage('Time up! Drawing submitted automatically.', 'info');
+                }
+            });
+        }
+        
+        if (data.phase === GameConfig.PHASES.COPYING) {
+            // Handle direct transition to copying phase
+            copyingManager.initializeCopyingPhase(data);
+            
+            // Start copying timer with auto-submit callback
+            uiManager.startTimer('copyingTimer', data.timer, () => {
+                if (gameStateManager.getPhase() === GameConfig.PHASES.COPYING) {
+                    copyingManager.autoSubmitRemainingCopies();
+                    uiManager.showMessage('Time up! Remaining copies submitted automatically.', 'info');
                 }
             });
         }
@@ -146,6 +149,8 @@ class GameManager {
             return;
         }
         
+        console.log('Handling copying assignment:', data);
+        
         gameStateManager.setPhase(GameConfig.PHASES.COPYING);
         copyingManager.initializeCopyingViewingPhase(data);
         
@@ -153,13 +158,15 @@ class GameManager {
         uiManager.startTimer('copyingTimer', data.timer, () => {
             if (gameStateManager.getPhase() === GameConfig.PHASES.COPYING) {
                 copyingManager.autoSubmitRemainingCopies();
-                uiManager.showError('Time up! Remaining copies submitted automatically.');
+                uiManager.showMessage('Time up! Remaining copies submitted automatically.', 'info');
             }
         });
     }
 
     handleCopyingViewingPhase(data) {
         // Transition to copying phase and initialize viewing
+        console.log('Handling copying viewing phase:', data);
+        
         gameStateManager.setPhase(GameConfig.PHASES.COPYING);
         copyingManager.initializeCopyingViewingPhase(data);
         
@@ -167,13 +174,15 @@ class GameManager {
         uiManager.startTimer('copyingTimer', data.total_timer, () => {
             if (gameStateManager.getPhase() === GameConfig.PHASES.COPYING) {
                 copyingManager.autoSubmitRemainingCopies();
-                uiManager.showError('Time up! Remaining copies submitted automatically.');
+                uiManager.showMessage('Time up! Remaining copies submitted automatically.', 'info');
             }
         });
     }
 
     handleCopyingPhaseStarted(data) {
         // Only transition if we're in the correct phase
+        console.log('Handling copying phase started:', data);
+        
         if (gameStateManager.getPhase() !== GameConfig.PHASES.COPYING) {
             gameStateManager.setPhase(GameConfig.PHASES.COPYING);
         }
@@ -204,8 +213,8 @@ class GameManager {
 
     handleGameEndedEarly(data) {
         uiManager.showError(`Game ended: ${data.reason}`);
-        if (data.final_balance && playerManager.getPlayerId() in data.final_balance) {
-            playerManager.setBalance(data.final_balance[playerManager.getPlayerId()]);
+        if (data.final_balances && playerManager.getPlayerId() in data.final_balances) {
+            playerManager.setBalance(data.final_balances[playerManager.getPlayerId()]);
         }
         setTimeout(() => this.returnHome(), 3000);
     }
@@ -231,6 +240,9 @@ class GameManager {
         
         this.resetAllManagers();
         uiManager.showView('home');
+
+        // Reload the correct balance from the server
+        playerManager.loadPlayerBalance();
         
         // Clear drawing canvas
         if (window.drawingCanvas) {
@@ -295,7 +307,7 @@ class GameManager {
             const element = document.getElementById(id);
             if (element) {
                 if (id === 'roomInfo') element.textContent = 'Room: -';
-                else if (id === 'balanceInfo') element.textContent = `Balance: $${GameConfig.INITIAL_BALANCE}`;
+                else if (id === 'balanceInfo') element.textContent = `Balance: ${GameConfig.INITIAL_BALANCE} Pixel Pts`;
                 else element.textContent = '';
             }
         });

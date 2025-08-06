@@ -81,11 +81,14 @@ class UIManager {
         const timer = document.getElementById('joiningTimer');
         let timeLeft = seconds;
         
+        // Set initial value immediately
+        timer.textContent = timeLeft;
+        
         const interval = setInterval(() => {
-            timer.textContent = timeLeft;
             timeLeft--;
+            timer.textContent = timeLeft;
             
-            if (timeLeft < 0) {
+            if (timeLeft <= 0) {
                 clearInterval(interval);
                 timer.textContent = "Starting...";
             }
@@ -140,11 +143,25 @@ class UIManager {
             clearInterval(interval);
         });
         this.timers.clear();
+        
+        // Reset timer displays to default state
+        const timerElements = ['gameTimer', 'joiningTimer', 'drawingTimer', 'copyingTimer', 'votingTimer'];
+        timerElements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = '0:00';
+            }
+        });
     }
 
     reset() {
         this.showScreen('homeScreen');
         this.clearAllTimers();
+        
+        // Clear canvas if it exists
+        if (window.drawingCanvas) {
+            drawingCanvas.clearCanvas();
+        }
         
         const modal = document.getElementById('joinCodeModal');
         if (modal) {
@@ -163,6 +180,12 @@ class UIManager {
         const modalErrorDisplay = document.getElementById('modalErrorDisplay');
         if (errorDisplay) errorDisplay.style.display = 'none';
         if (modalErrorDisplay) modalErrorDisplay.style.display = 'none';
+        
+        // Hide countdown display
+        const countdownDisplay = document.getElementById('countdownDisplay');
+        if (countdownDisplay) {
+            countdownDisplay.style.display = 'none';
+        }
     }
 
     validateRoomForm() {

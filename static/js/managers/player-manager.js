@@ -6,7 +6,30 @@ class PlayerManager {
         this.playerList = [];
         
         // Initialize balance display after a short delay to ensure DOM is ready
-        setTimeout(() => this.updateBalanceDisplay(), 0);
+        setTimeout(() => this.loadPlayerBalance(), 100);
+    }
+
+    async loadPlayerBalance() {
+        // Load player balance from server based on username
+        if (window.gameUserData && window.gameUserData.username) {
+            try {
+                const response = await fetch(`/api/player/balance/${encodeURIComponent(window.gameUserData.username)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.currentBalance = data.balance;
+                    this.updateBalanceDisplay();
+                    console.log(`Loaded balance for ${window.gameUserData.username}: ${this.currentBalance} Pixel Pts`);
+                } else {
+                    console.warn('Failed to load player balance, using default');
+                    this.updateBalanceDisplay();
+                }
+            } catch (error) {
+                console.warn('Error loading player balance:', error);
+                this.updateBalanceDisplay();
+            }
+        } else {
+            this.updateBalanceDisplay();
+        }
     }
 
     setPlayerId(playerId) {
@@ -34,7 +57,7 @@ class PlayerManager {
     updateBalanceDisplay() {
         const balanceElement = document.getElementById('balanceInfo');
         if (balanceElement) {
-            balanceElement.textContent = `Balance: $${this.currentBalance}`;
+            balanceElement.textContent = `Balance: ${Math.round(this.currentBalance)} Pixel Pts`;
         }
     }
 
@@ -51,7 +74,7 @@ class PlayerManager {
         playerListElement.innerHTML = players.map(player => `
             <div class="player-item ${player.id === this.playerId ? 'current-player' : ''}">
                 <span class="player-name">${player.username || `Player ${player.id}`}</span>
-                <span class="player-balance">$${player.balance || 0}</span>
+                <span class="player-balance">${Math.round(player.balance || 0)} Pixel Pts</span>
                 ${player.ready ? '<span class="ready-indicator">✓</span>' : ''}
             </div>
         `).join('');
