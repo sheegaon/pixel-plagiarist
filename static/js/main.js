@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.debug = () => window.pixelPlagiarist.getDebugInfo();
         }
         else {
-            window.debug = (message) => console.log(`[DEBUG] ${message}`);
+            window.debug = (message) => {};
         }
     } catch (error) {
         console.error('Critical initialization error:', error);
