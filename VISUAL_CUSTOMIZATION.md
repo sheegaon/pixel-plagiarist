@@ -1,127 +1,164 @@
 # Pixel Plagiarist Visual Customization Guide
 
 ## Overview
-The game includes an asset management system that provides attractive default styling and allows easy replacement of individual visual elements with custom graphics. The system gracefully falls back to default styling when custom images aren't available.
+
+Pixel Plagiarist features a flexible asset management system designed to make visual customization straightforward and non-disruptive. The system provides a set of attractive default styles—drawing from modern UI trends like gradients, glass-morphism, and subtle animations—while allowing developers, designers, or users to replace individual elements with custom graphics. If a custom asset isn't provided or fails to load, the game gracefully falls back to its default styling, ensuring the application remains functional and visually coherent.
+
+This guide covers the asset directory structure, default visuals, step-by-step customization processes, technical specifications, best practices, and advanced techniques. Whether you're rebranding the game for a specific audience, integrating thematic elements (e.g., holiday specials), or enhancing accessibility, this system supports incremental changes without requiring code modifications.
+
+The asset manager (implemented in `static/js/asset-manager.js`) scans for files in predefined directories on load and dynamically applies them to UI components. This modular approach minimizes conflicts and supports hot-reloading during development.
 
 ## Directory Structure
+
+Assets are organized in a logical hierarchy under the `static/` folder. This structure separates core game images from icons, UI elements, and themes, making it easy to manage and expand.
+
 ```
 static/
 ├── images/
-│   ├── game-logo.png                 # Main game logo (replaces emoji in title)
-│   ├── game-background.jpg           # Main background image
+│   ├── game-logo.png                 # Main game logo (replaces default title emoji or text)
+│   ├── game-background.jpg           # Primary background image (overrides animated gradient)
 │   ├── icons/
-│   │   ├── exit-icon.png            # Exit/leave room button
-│   │   ├── paint-icon.png           # Drawing/art related icons  
-│   │   ├── trophy-icon.png          # Leaderboard/trophy icon
-│   │   ├── refresh-icon.png         # Refresh button
-│   │   ├── timer-icon.png           # Timer related icons
-│   │   ├── users-icon.png           # Player/user icons
-│   │   └── coins-icon.png           # Money/balance icons
+│   │   ├── exit-icon.png             # Exit/leave room button icon
+│   │   ├── paint-icon.png            # Drawing or art-related icons (e.g., brush tool)
+│   │   ├── trophy-icon.png           # Leaderboard or achievement icons
+│   │   ├── refresh-icon.png          # Refresh button icon
+│   │   ├── timer-icon.png            # Timer or countdown icons
+│   │   ├── users-icon.png            # Player list or user-related icons
+│   │   ├── coins-icon.png            # Balance or token icons
+│   │   └── custom-icon-example.png   # Add custom icons as needed (e.g., for new features)
 │   ├── ui/
-│   │   ├── timer-bg.png             # Timer background decoration
-│   │   ├── canvas-border.png        # Drawing canvas border image
-│   │   └── button-bg.png            # Custom button backgrounds
+│   │   ├── timer-bg.png              # Background for countdown timers
+│   │   ├── canvas-border.png         # Border frame around drawing canvases
+│   │   ├── button-bg.png             # Background texture or pattern for buttons
+│   │   └── modal-bg.png              # Background for modals and overlays (new in expanded guide)
 │   └── themes/
-│       └── [theme folders for future expansion]
+│       ├── default/                  # (Optional) Backup of default assets
+│       ├── holiday/                  # Example theme folder (e.g., for seasonal events)
+│       │   ├── game-background.jpg   # Theme-specific overrides
+│       │   └── icons/                # Subfolder for theme icons
+│       └── dark-mode/                # Another example for alternative themes
 ```
+
+- **Note**: File names are case-sensitive and must match exactly (e.g., `game-logo.png`). Supported formats include PNG (for transparency), JPG (for photos), SVG (for scalable vectors), and WebP (for optimized web delivery). The system prioritizes SVG for icons where possible for better scaling.
 
 ## Default Styling
 
-### Visual Design Elements
-- **Animated gradient background** with smooth color transitions
-- **Glass-morphism UI elements** with blur effects and transparency
-- **Styled buttons** with gradients, shadows, and hover animations
-- **Pulsing timer** with red gradient styling
-- **Modern typography** with gradient text effects
-- **Smooth transitions** and micro-animations throughout
+The game's out-of-the-box visuals create an engaging, modern atmosphere inspired by digital art tools and social games. Key elements include:
 
-### Custom Image Integration
-When images are added to the appropriate folders, they automatically replace the default elements:
+### Visual Design Elements
+- **Animated Gradient Background**: A shifting linear gradient (from #667eea to #f093fb) that animates over 15 seconds, providing a dynamic yet non-distracting canvas.
+- **Glass-Morphism UI Elements**: Semi-transparent panels with backdrop blur (e.g., `backdrop-filter: blur(10px)`), subtle borders, and shadows for a premium, layered feel.
+- **Styled Buttons**: Gradient backgrounds (#4299e1 to #3182ce), hover animations (scale and shadow lift), and active states for tactile feedback.
+- **Pulsing Timer**: Red-toned (#e53e3e) with a subtle glow animation to convey urgency without overwhelming the player.
+- **Modern Typography**: Sans-serif fonts (Segoe UI fallback) with gradient text effects on titles and bold weights for readability.
+- **Smooth Transitions**: 0.3s ease-in-out animations on hovers, phase changes, and modals for a polished user experience.
+- **Canvas Styling**: White backgrounds with gradient borders and pixelated rendering on high-DPI screens for a retro-digital art vibe.
+
+These defaults ensure the game looks professional even without customizations, but they can be overridden progressively.
+
+## Custom Image Integration
+
+When you add files to the directories above, the asset manager automatically detects and integrates them:
+- **Replacement Logic**: On page load, the manager checks for custom files and swaps them in (e.g., via CSS `background-image` or JS `img.src`).
+- **Fallback Mechanism**: If a custom asset is missing or invalid (e.g., broken link), it reverts to defaults like emojis for icons or pure CSS gradients for backgrounds.
+- **Dynamic Updates**: Supports runtime changes via console commands (see below), useful for live previews.
+
+This integration is seamless—no code changes needed for basic swaps.
 
 ## Customization Steps
 
-### 1. Replace Background
-- Add `game-background.jpg` to `/static/images/`
-- Supports: JPG, PNG, WebP formats
-- Recommended: High resolution, landscape orientation
-- The animated gradient remains as fallback
+Follow these steps to customize incrementally, starting with high-impact elements.
 
-### 2. Add Custom Logo
-- Add `game-logo.png` to `/static/images/`
-- Recommended size: 48px height (width auto-scales)
-- Appears next to the game title
-- Title text remains for branding
+### 1. Replace the Background
+- **File**: Add `game-background.jpg` (or .png/.webp) to `/static/images/`.
+- **Effect**: Overrides the animated gradient, applied to the body via CSS.
+- **Best Practices**: Use high-contrast images for readability. Compress files (e.g., via TinyPNG) to under 500KB for fast loading.
+- **Example**: A starry night sky for a "cosmic art" theme—ensures text and UI elements remain visible.
+
+### 2. Add a Custom Logo
+- **File**: Add `game-logo.png` (or .svg) to `/static/images/`.
+- **Effect**: Appears beside the game title in headers, replacing any default emoji or text placeholder.
+- **Best Practices**: Design for 48px height; include transparency for seamless integration. Use SVG for crisp edges on all devices.
+- **Example**: A pixelated artist palette icon to reinforce the drawing theme.
 
 ### 3. Replace Icons
-Add any of these to `/static/images/icons/`:
-- `exit-icon.png` - Leave room button
-- `trophy-icon.png` - Leaderboard button  
-- `refresh-icon.png` - Refresh rooms button
-- `paint-icon.png` - Art/drawing related elements
-- `timer-icon.png` - Timer decorations
-- `users-icon.png` - Player count displays
-- `coins-icon.png` - Balance/money displays
+- **Files**: Add to `/static/images/icons/` (e.g., `exit-icon.png`).
+- **Effect**: Replaces emojis or default SVGs in buttons and UI (e.g., exit icon on leave buttons).
+- **Best Practices**: Aim for monochromatic designs that work on light/dark backgrounds. Size: 24-48px square.
+- **Example**: A custom trophy icon with game-specific flair, like a plagiarized Mona Lisa.
 
-Icons automatically replace emojis when available, with smooth transitions.
+### 4. Customize UI Elements
+- **Files**: Add to `/static/images/ui/` (e.g., `timer-bg.png` for timer backgrounds).
+- **Effect**: Enhances specific components, like adding a patterned border to canvases.
+- **Best Practices**: Ensure transparency where needed (e.g., PNG for borders). Test on mobile for scaling.
+- **New Addition**: Introduce `modal-bg.png` for custom modal backgrounds, applied via CSS.
 
-### 4. UI Element Customization
-Add to `/static/images/ui/`:
-- `timer-bg.png` - Background decoration for countdown timers
-- `canvas-border.png` - Custom border around drawing canvases
-- `button-bg.png` - Background texture for themed buttons
+### 5. Create and Apply Themes (Advanced)
+- **Folder**: Add subfolders under `/static/images/themes/` (e.g., `holiday/`).
+- **Effect**: Load entire themes via a query parameter (e.g., `?theme=holiday`) or JS config.
+- **Best Practices**: Duplicate and modify defaults. Use for events (e.g., Halloween with orange gradients).
+- **Example**: A "dark-mode" theme with inverted colors for low-light play.
 
 ## Development Console Commands
 
-For testing and development, assets can be replaced at runtime:
-
+For testing customizations without restarts:
 ```javascript
-// Replace an icon
-assetManager.replaceAsset('icons', 'exit', '../images/icons/custom-exit.png');
+// Replace a specific icon
+assetManager.replaceAsset('icons', 'exit', '/static/images/icons/custom-exit.png');
 
-// Replace background
-assetManager.replaceAsset('backgrounds', 'main', '../images/new-background.jpg');
+// Swap the main background
+assetManager.replaceAsset('backgrounds', 'main', '/static/images/new-background.jpg');
 
-// Check current assets
+// Load a full theme
+assetManager.loadTheme('holiday');
+
+// List current assets for debugging
 console.log(assetManager.assets);
+
+// Revert to defaults
+assetManager.resetToDefaults();
 ```
 
-## Image Specifications
+These commands trigger immediate UI updates, ideal for iterative design.
 
-### Backgrounds
-- **Main background**: 1920x1080+ recommended for full coverage
-- **UI backgrounds**: 200x100+ depending on element size
-- **Formats**: JPG (smaller file size), PNG (transparency support), WebP (modern browsers)
+## Image Specifications and Best Practices
 
-### Icons
-- **Size**: 20x20px to 64x64px (auto-scaling applied)
-- **Format**: PNG recommended for transparency support
-- **Style**: Should work on both light and dark backgrounds
+### General Guidelines
+- **Tools**: Use free tools like Canva, GIMP, or Adobe Photoshop. For vectors: Inkscape or Figma.
+- **Optimization**: Compress images (aim <100KB per file) using tools like ImageOptim. Support WebP for modern browsers.
+- **Accessibility**: Ensure high contrast (WCAG AA compliant, e.g., 4.5:1 ratio). Add alt text in HTML where applicable.
+- **Testing**: Preview on multiple devices (desktop, mobile) and browsers. Use Lighthouse for performance audits.
 
-### Logos
-- **Height**: 48px recommended (width scales proportionally)
-- **Format**: PNG for transparency, SVG for crisp scaling
-- **Style**: Should complement the gradient title text
+### Specific Specs
+- **Backgrounds**: 1920x1080px minimum; landscape; JPG/WebP; subtle patterns to avoid clashing with UI.
+- **Icons**: 24-64px square; PNG/SVG; transparent backgrounds; simple, scalable designs.
+- **Logos**: 48px height (auto width); PNG/SVG; bold, recognizable at small sizes.
+- **UI Elements**: Vary by component (e.g., timer-bg: 200x100px); PNG for overlays; match game's rounded aesthetics.
 
-## Current Visual Theme
+## Current Visual Theme and Expansion Ideas
 
-### Color Palette
-- **Primary**: Blue gradients (#4299e1 to #3182ce)
-- **Success**: Green gradients (#48bb78 to #38a169)  
-- **Warning/Timer**: Red gradients (#e53e3e variants)
-- **Background**: Purple-pink gradient animation
+### Color Palette (Defaults)
+- Primary: Blues (#4299e1 → #3182ce) for buttons and accents.
+- Success: Greens (#48bb78 → #38a169) for positives like votes.
+- Warning: Reds (#e53e3e) for timers and errors.
+- Background: Purple-pink gradients for energy.
 
-### Visual Effects
-- **Glass morphism**: Translucent panels with backdrop blur
-- **Smooth animations**: 0.3s transitions on hover/interaction
-- **Gradient borders**: Canvas and UI elements feature gradient borders
-- **Pulsing timer**: Subtle scale animation for urgency indication
-- **Hover effects**: Lift and glow effects on interactive elements
+### Visual Effects (Defaults)
+- Glass-morphism for depth.
+- Animations for engagement (e.g., pulse on timers).
+- Hover lifts for interactivity.
 
-## Implementation Approach
+### Expansion Ideas
+- **Seasonal Themes**: Auto-switch based on date (e.g., Christmas snowflakes).
+- **User-Selectable Skins**: Allow players to choose themes via settings.
+- **CSS Overrides**: For deeper changes, edit `main.css` (e.g., `--primary-color: #your-hex;` for variables).
+- **Accessibility Mode**: Add a high-contrast theme in `/themes/accessibility/` with larger icons and bolder colors.
 
-1. **Start with background**: Add a custom `game-background.jpg` for immediate visual impact
-2. **Add branding**: Create a `game-logo.png` for brand recognition
-3. **Replace icons incrementally**: Add icons one by one as they're created
-4. **Customize specific elements**: Use the UI folder for detailed customizations
+## Troubleshooting
 
-The system is designed to allow incremental visual customization without breaking functionality. Each addition enhances the game's visual uniqueness while maintaining the polished default appearance for uncustomized elements.
+- **Asset Not Loading**: Check file paths, names, and browser console for 404 errors. Clear cache.
+- **Performance Issues**: Oversized images? Compress them. Test with slow connections.
+- **Fallback Failures**: Ensure defaults are intact in code. Log issues via `console.error(assetManager.errors)`.
+- **Compatibility**: SVG icons may need polyfills for older browsers; test on IE/Edge if needed.
+
+This expanded guide empowers you to transform Pixel Plagiarist's visuals while preserving its core appeal. For code-level integrations or custom scripts, refer to the architecture docs or consult the asset manager module. If you encounter issues, share feedback in the project's issues tracker!
