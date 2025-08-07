@@ -146,7 +146,7 @@ class PixelPlagiaristAI:
     def __init__(self, name="AI_Player", host="localhost", port=5000, use_ssl=False):
         """
         Initialize AI player.
-        
+
         Parameters
         ----------
         name : str
@@ -176,6 +176,7 @@ class PixelPlagiaristAI:
         # Control flags
         self.running = False
         self.should_stop = False
+        self.connected = False  # Track connection state
 
         # AI configuration
         self.auto_join_delay = random.uniform(1, 3)  # Random delay before joining
@@ -186,6 +187,9 @@ class PixelPlagiaristAI:
         self.sio = socketio.Client()
         self.setup_event_handlers()
 
+        # Pending timers to cancel if needed
+        self.pending_timers = []
+
         safe_print(f"🤖 AI Player '{self.name}' initialized")
 
     def setup_event_handlers(self):
@@ -193,14 +197,18 @@ class PixelPlagiaristAI:
 
         @self.sio.event
         def connect():
+            self.connected = True
             safe_print(f"🔗 {self.name} connected to server")
             # Request room list immediately after connection and start looking for rooms
             self.looking_for_room = True
-            self.sio.emit('request_room_list')
+            self.safe_emit('request_room_list')
 
         @self.sio.event
         def disconnect():
+            self.connected = False
             safe_print(f"❌ {self.name} disconnected from server")
+            # Cancel any pending timers when disconnected
+            self.cancel_pending_timers()
 
         @self.sio.on('room_list_updated')
         def on_room_list_updated(data):
@@ -307,10 +315,47 @@ class PixelPlagiaristAI:
             if 'Room not found' in error_msg or 'full' in error_msg.lower():
                 self.schedule_action(self.find_existing_room, delay=10.0)
 
+    def safe_emit(self, event, data=None):
+        """
+        Safely emit Socket.IO events, only if connected.
+
+        Parameters
+        ----------
+        event : str
+            Event name to emit
+        data : dict, optional
+            Data to send with the event
+
+        Returns
+        -------
+        bool
+            True if emission was successful, False otherwise
+        """
+        if not self.connected or not self.sio.connected:
+            safe_print(f"⚠️ {self.name}: Cannot emit '{event}' - not connected")
+            return False
+
+        try:
+            if data is None:
+                self.sio.emit(event)
+            else:
+                self.sio.emit(event, data)
+            return True
+        except Exception as e:
+            safe_print(f"❌ {self.name}: Failed to emit '{event}' - {e}")
+            return False
+
+    def cancel_pending_timers(self):
+        """Cancel all pending timers to prevent actions after disconnect."""
+        for timer in self.pending_timers:
+            if timer.is_alive():
+                timer.cancel()
+        self.pending_timers.clear()
+
     def schedule_action(self, action, *args, delay=None):
         """
         Schedule an AI action with random delay for more human-like behavior.
-        
+
         Parameters
         ----------
         action : callable
@@ -323,26 +368,48 @@ class PixelPlagiaristAI:
         if delay is None:
             delay = random.uniform(*self.response_delay_range)
 
-        threading.Timer(delay, lambda: action(*args)).start()
+        # Check if we should stop before scheduling
+        if self.should_stop or shutdown_event.is_set():
+            return
+
+        def safe_action():
+            # Double-check before executing
+            if not self.should_stop and not shutdown_event.is_set():
+                try:
+                    action(*args)
+                except Exception as e:
+                    safe_print(f"❌ {self.name}: Error executing scheduled action - {e}")
+
+        timer = threading.Timer(delay, safe_action)
+        self.pending_timers.append(timer)
+        timer.start()
 
     def find_existing_room(self):
         """
         Request room list from server to find available rooms.
+        Only executes if connected.
         """
+        if not self.connected:
+            safe_print(f"⚠️ {self.name}: Cannot search for rooms - not connected")
+            return
+
         self.looking_for_room = True  # Set flag to indicate active search
-        self.sio.emit('request_room_list')
+        success = self.safe_emit('request_room_list')
+        if not success:
+            # Retry after a delay if emission failed
+            self.schedule_action(self.find_existing_room, delay=5.0)
 
     def check_room_for_humans(self):
         """
         Check if the current room has human players after joining.
         If no human players are found, leave the room.
         """
-        if not self.room_id:
+        if not self.room_id or not self.connected:
             return
 
         safe_print(f"🔍 {self.name}: Checking room {self.room_id} for human players...")
         # Request current room list to get updated player information
-        self.sio.emit('request_room_list')
+        self.safe_emit('request_room_list')
 
     def check_current_room_for_humans(self, players):
         """
@@ -385,18 +452,22 @@ class PixelPlagiaristAI:
         """
         Leave the current room and start looking for a new one with human players.
         """
-        if self.room_id and self.game_phase == "waiting":
+        if self.room_id and self.game_phase == "waiting" and self.connected:
             safe_print(f"🚪 {self.name}: Leaving room {self.room_id} to find humans...")
             self.looking_for_room = True
-            self.sio.emit('leave_room')
+            self.safe_emit('leave_room')
         else:
-            safe_print(f"❌ {self.name}: Cannot leave room - either not in a room or game in progress")
+            safe_print(f"❌ {self.name}: Cannot leave room - either not in a room, game in progress, or not connected")
 
     def try_join_available_room(self):
         """
         Try to join one of the available rooms from the server's room list.
         Prioritizes rooms that are waiting for players and contain human players.
         """
+        if not self.connected:
+            safe_print(f"⚠️ {self.name}: Cannot join room - not connected")
+            return
+
         if not self.available_rooms:
             safe_print(f"📭 {self.name}: No available rooms found, waiting...")
             self.looking_for_room = False  # Stop looking temporarily
@@ -416,10 +487,10 @@ class PixelPlagiaristAI:
             room_id = best_room['room_id']
 
             safe_print(f"🎯 {self.name}: Attempting to join room {room_id} "
-                  f"({best_room['player_count']}/{best_room['max_players']} players) "
-                  f"with human players")
+                       f"({best_room['player_count']}/{best_room['max_players']} players) "
+                       f"with human players")
 
-            self.sio.emit('join_room', {
+            self.safe_emit('join_room', {
                 'room_id': room_id,
                 'username': self.name
             })
@@ -431,9 +502,13 @@ class PixelPlagiaristAI:
     def draw_original(self):
         """
         Draw an original artwork for the current prompt.
-        
+
         Now includes shape variety and basic prompt awareness.
         """
+        if not self.connected:
+            safe_print(f"⚠️ {self.name}: Cannot draw - not connected")
+            return
+
         safe_print(f"✏️ {self.name}: Drawing original artwork for '{self.current_prompt}'")
 
         # Choose shape based on prompt and variety
@@ -442,16 +517,20 @@ class PixelPlagiaristAI:
 
         drawing_data = self.create_simple_drawing(chosen_shape)
 
-        self.sio.emit('submit_original', {
+        self.safe_emit('submit_original', {
             'drawing_data': drawing_data  # Fixed: use 'drawing_data' not 'drawing'
         })
 
     def copy_drawings(self):
         """
         Copy assigned original drawings.
-        
+
         Now includes shape variety for copies.
         """
+        if not self.connected:
+            safe_print(f"⚠️ {self.name}: Cannot copy - not connected")
+            return
+
         for target in self.copying_targets:
             target_id = target['target_id']
             safe_print(f"🎨 {self.name}: Copying drawing from player {target_id}")
@@ -461,7 +540,7 @@ class PixelPlagiaristAI:
             safe_print(f"🎨 {self.name}: Chose to copy with a {chosen_shape}")
             copy_data = self.create_simple_drawing(chosen_shape)
 
-            self.sio.emit('submit_copy', {
+            self.safe_emit('submit_copy', {
                 'target_id': target_id,
                 'drawing_data': copy_data  # Fixed: use correct event and key names
             })
@@ -472,7 +551,7 @@ class PixelPlagiaristAI:
     def vote_randomly(self):
         """
         Cast a random vote during voting phase.
-        
+
         Current implementation: Completely random selection.
         Enhancement opportunities:
         - Analyze drawing quality/complexity
@@ -481,30 +560,34 @@ class PixelPlagiaristAI:
         - Learn voting patterns from previous games
         - Consider drawing style consistency
         """
+        if not self.connected:
+            safe_print(f"⚠️ {self.name}: Cannot vote - not connected")
+            return
+
         if self.voting_drawings:
             chosen_drawing = random.choice(self.voting_drawings)
             drawing_id = chosen_drawing['id']
             safe_print(f"🗳️ {self.name}: Voting for drawing {drawing_id}")
 
-            self.sio.emit('submit_vote', {'drawing_id': drawing_id})
+            self.safe_emit('submit_vote', {'drawing_id': drawing_id})
 
     @staticmethod
     def create_simple_drawing(shape="X"):
         """
         Create a simple drawing as base64-encoded image data.
-        
+
         Current implementation: Basic shapes on white background.
         Enhancement opportunities:
         - More sophisticated drawing algorithms
         - Variable colors and styles
         - Pattern generation based on prompts
         - Basic geometric shape combinations
-        
+
         Parameters
         ----------
         shape : str
             Type of shape to draw ("X", "O", "line", etc.)
-            
+
         Returns
         -------
         str
@@ -542,14 +625,14 @@ class PixelPlagiaristAI:
                 # Draw a filled circle
                 circle_size = min(width, height) // 3
                 center_x, center_y = width // 2, height // 2
-                draw.ellipse([center_x - circle_size, center_y - circle_size, 
-                             center_x + circle_size, center_y + circle_size], fill=color)
+                draw.ellipse([center_x - circle_size, center_y - circle_size,
+                              center_x + circle_size, center_y + circle_size], fill=color)
             elif shape == "square":
                 # Draw a filled square
                 square_size = min(width, height) // 3
                 center_x, center_y = width // 2, height // 2
                 draw.rectangle([center_x - square_size, center_y - square_size,
-                               center_x + square_size, center_y + square_size], fill=color)
+                                center_x + square_size, center_y + square_size], fill=color)
             elif shape == "triangle":
                 # Draw a triangle
                 center_x, center_y = width // 2, height // 2
@@ -557,7 +640,7 @@ class PixelPlagiaristAI:
                 draw.polygon([
                     (center_x, center_y - size),  # top point
                     (center_x - size, center_y + size),  # bottom left
-                    (center_x + size, center_y + size)   # bottom right
+                    (center_x + size, center_y + size)  # bottom right
                 ], fill=color)
             else:
                 # Default: simple X (guaranteed to be visible)
@@ -569,7 +652,7 @@ class PixelPlagiaristAI:
             image.save(buffer, format='PNG', optimize=False)  # Don't optimize to avoid issues
             buffer.seek(0)
             image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
+
             # Verify the image data is valid before returning
             if len(image_data) < 100:  # Too small to be a valid image
                 raise ValueError("Generated image data too small")
@@ -577,7 +660,7 @@ class PixelPlagiaristAI:
             result = f"data:image/png;base64,{image_data}"
             safe_print(f"✅ {PixelPlagiaristAI.__name__}: Created {shape} drawing ({len(image_data)} bytes)")
             return result
-            
+
         except Exception as e:
             safe_print(f"⚠️ Error creating {shape} drawing: {e}")
             # Return a guaranteed working fallback
@@ -588,7 +671,7 @@ class PixelPlagiaristAI:
         """
         Create a guaranteed working fallback drawing.
         This uses the most basic PIL operations to ensure it always works.
-        
+
         Returns
         -------
         str
@@ -599,22 +682,22 @@ class PixelPlagiaristAI:
             width, height = 400, 300
             image = Image.new('RGB', (width, height), 'white')
             draw = ImageDraw.Draw(image)
-            
+
             # Draw a simple black square in the center - guaranteed to be visible
             center_x, center_y = width // 2, height // 2
             size = 50
             draw.rectangle([center_x - size, center_y - size, center_x + size, center_y + size],
                            fill='black', outline='black')
-            
+
             # Convert to base64
             buffer = io.BytesIO()
             image.save(buffer, format='PNG')
             image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
+
             result = f"data:image/png;base64,{image_data}"
             safe_print(f"✅ Fallback: Created guaranteed black square ({len(image_data)} bytes)")
             return result
-            
+
         except Exception as e:
             safe_print(f"❌ Even guaranteed fallback failed: {e}")
             # Last resort: return a minimal valid base64 PNG with visible content
@@ -635,6 +718,8 @@ class PixelPlagiaristAI:
 
     def disconnect(self):
         """Disconnect from the server."""
+        self.connected = False
+        self.cancel_pending_timers()  # Cancel all pending actions
         if self.sio.connected:
             self.sio.disconnect()
             safe_print(f"👋 {self.name}: Disconnected")
@@ -661,15 +746,16 @@ class PixelPlagiaristAI:
         """Stop the AI player gracefully."""
         self.should_stop = True
         self.running = False
+        self.disconnect()
 
 
 def is_ai_player(username):
     """Detect whether a username belongs to an AI player."""
     if not username:
         return False
-    return (username.startswith('AI_') or 
-            'Bot' in username or 
-            username.startswith('AI ') or 
+    return (username.startswith('AI_') or
+            'Bot' in username or
+            username.startswith('AI ') or
             username.endswith('_AI') or
             username.startswith('AI Player') or
             username.startswith('TestBot'))

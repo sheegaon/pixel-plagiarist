@@ -60,7 +60,7 @@ class GameStateSH:
             room_id = str(uuid.uuid4())[:8].upper()
             new_game = GameStateGL(room_id, CONSTANTS['MIN_STAKE'])
             self.GAMES[room_id] = new_game
-            debug_log("Created guaranteed Bronze room", None, room_id, {'stake': CONSTANTS['MIN_STAKE']})
+            debug_log("Created default Bronze room", None, room_id, {'stake': CONSTANTS['MIN_STAKE']})
             return room_id
 
         return None

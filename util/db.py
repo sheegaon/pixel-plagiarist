@@ -156,7 +156,7 @@ def get_or_create_player(username, email=None):
                     WHERE username = ?
                 ''', (username,))
                 
-                debug_log("Retrieved existing player", None, None, {
+                debug_log("DB operation: Retrieved existing player", None, None, {
                     'username': username,
                     'balance': player['balance'],
                     'games_played': player['games_played']
@@ -174,7 +174,7 @@ def get_or_create_player(username, email=None):
                 cursor.execute('SELECT * FROM players WHERE username = ?', (username,))
                 player = cursor.fetchone()
                 
-                debug_log("Created new player", None, None, {
+                debug_log("DB operation: Created new player", None, None, {
                     'username': username,
                     'initial_balance': CONSTANTS['INITIAL_BALANCE']
                 })
@@ -182,7 +182,7 @@ def get_or_create_player(username, email=None):
                 return dict(player)
                 
     except Exception as e:
-        debug_log("Failed to get or create player", None, None, {
+        debug_log("DB operation: Failed to get or create player", None, None, {
             'error': str(e),
             'username': username
         })
@@ -209,14 +209,14 @@ def delete_player(username):
             cursor.execute('DELETE FROM players WHERE username = ?', (username,))
 
             if cursor.rowcount > 0:
-                debug_log("Deleted player", None, None, {'username': username})
+                debug_log("DB operation: Deleted player", None, None, {'username': username})
                 return True
             else:
-                debug_log("Player not found for deletion", None, None, {'username': username})
+                debug_log("DB operation: Player not found for deletion", None, None, {'username': username})
                 return False
 
     except Exception as e:
-        debug_log("Failed to delete player", None, None, {
+        debug_log("DB operation: Failed to delete player", None, None, {
             'error': str(e),
             'username': username
         })
@@ -249,20 +249,20 @@ def update_player_balance(username, new_balance):
             ''', (new_balance, username))
             
             if cursor.rowcount > 0:
-                debug_log("Updated player balance", None, None, {
+                debug_log("DB operation: Updated player balance", None, None, {
                     'username': username,
                     'new_balance': new_balance
                 })
                 return True
             else:
-                debug_log("Player not found for balance update", None, None, {
+                debug_log("DB operation: Player not found for balance update", None, None, {
                     'username': username,
                     'new_balance': new_balance
                 })
                 return False
                 
     except Exception as e:
-        debug_log("Failed to update player balance", None, None, {
+        debug_log("DB operation: Failed to update player balance", None, None, {
             'error': str(e),
             'username': username,
             'new_balance': new_balance
@@ -335,7 +335,7 @@ def record_game_completion(username, room_id, balance_before, balance_after, sta
                   originals_drawn, copies_made, votes_cast, correct_votes,
                   balance_after, username))
             
-            debug_log("Recorded game completion", None, room_id, {
+            debug_log("DB operation: Recorded game completion", None, room_id, {
                 'username': username,
                 'balance_change': balance_after - balance_before,
                 'points_earned': points_earned,
@@ -343,7 +343,7 @@ def record_game_completion(username, room_id, balance_before, balance_after, sta
             })
             
     except Exception as e:
-        debug_log("Failed to record game completion", None, room_id, {
+        debug_log("DB operation: Failed to record game completion", None, room_id, {
             'error': str(e),
             'username': username
         })
@@ -371,11 +371,12 @@ def get_player_stats(username):
             player = cursor.fetchone()
             
             if player:
+                debug_log("DB operation: Retrieved player stats", None, None, dict(player))
                 return dict(player)
             return None
             
     except Exception as e:
-        debug_log("Failed to get player stats", None, None, {
+        debug_log("DB operation: Failed to get player stats", None, None, {
             'error': str(e),
             'username': username
         })
@@ -438,7 +439,7 @@ def get_leaderboard(limit=50):
             return [dict(player) for player in players]
             
     except Exception as e:
-        debug_log("Failed to get leaderboard", None, None, {'error': str(e)})
+        debug_log("DB operation: Failed to get leaderboard", None, None, {'error': str(e)})
         return []
 
 
@@ -460,13 +461,13 @@ def cleanup_old_game_history(days_old=30):
             '''.format(days_old))
             
             deleted_count = cursor.rowcount
-            debug_log("Cleaned up old game history", None, None, {
+            debug_log("DB operation: Cleaned up old game history", None, None, {
                 'deleted_records': deleted_count,
                 'days_old': days_old
             })
             
     except Exception as e:
-        debug_log("Failed to cleanup old game history", None, None, {'error': str(e)})
+        debug_log("DB operation: Failed to cleanup old game history", None, None, {'error': str(e)})
 
 
 def close_connections():

@@ -207,6 +207,8 @@ class GameStateGL:
             self.player_balances_before_game[player_id] = self.players[player_id]['balance']
             # Deduct the game entry fee from each player's balance
             self.players[player_id]['balance'] -= self.entry_fee
+            debug_log("Deducted entry fee", player_id, self.room_id,
+                      {'entry_fee': self.entry_fee, 'new_balance': self.players[player_id]['balance']})
 
         # Ensure joining countdown timer is stopped
         self.timer.stop_joining_countdown()
@@ -259,7 +261,7 @@ class GameStateGL:
                 if stake > 0:
                     # Return the stake amount to player's balance
                     self.players[player_id]['balance'] += stake
-                    debug_log("Returned stake to player for early game end", player_id, self.room_id, {
+                    debug_log("Returned stake for early game end", player_id, self.room_id, {
                         'stake_returned': stake,
                         'new_balance': self.players[player_id]['balance']
                     })
