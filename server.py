@@ -318,5 +318,7 @@ if __name__ == '__main__':
         app,
         host='0.0.0.0',
         port=port,
-        debug=CONSTANTS['debug_mode']
+        debug=CONSTANTS['debug_mode'],
+        allow_unsafe_werkzeug=os.getenv('WERKZEUG_ALLOW_ASYNC_UNSAFE', 'false').lower() == 'true',
+        use_reloader=os.getenv('USE_RELOADER', 'true').lower() == 'true'
     )

@@ -1,0 +1,8 @@
+# Test dependencies for Pixel Plagiarist end-to-end tests
+pytest>=7.0.0
+selenium>=4.0.0
+requests>=2.28.0
+
+# Note: ChromeDriver must be installed separately
+# Download from: https://chromedriver.chromium.org/
+# Or install via: pip install chromedriver-autoinstaller

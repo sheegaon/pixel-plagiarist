@@ -44,6 +44,22 @@ import socketio
 shutdown_event = threading.Event()
 
 
+def safe_print(message):
+    """
+    Print messages safely, handling potential Unicode errors.
+
+    Parameters
+    ----------
+    message : str
+        The message to print
+    """
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        # Fallback for environments that don't support certain characters
+        print(message.encode('utf-8', errors='replace').decode('utf-8', errors='replace'))
+
+
 def signal_handler(signum, frame):
     """Handle Ctrl+C and other termination signals."""
     print(f"\n⏹️ Received signal {signum}, shutting down AI players...")
@@ -170,21 +186,21 @@ class PixelPlagiaristAI:
         self.sio = socketio.Client()
         self.setup_event_handlers()
 
-        print(f"🤖 AI Player '{self.name}' initialized")
+        safe_print(f"🤖 AI Player '{self.name}' initialized")
 
     def setup_event_handlers(self):
         """Set up Socket.IO event handlers for game communication."""
 
         @self.sio.event
         def connect():
-            print(f"🔗 {self.name} connected to server")
+            safe_print(f"🔗 {self.name} connected to server")
             # Request room list immediately after connection and start looking for rooms
             self.looking_for_room = True
             self.sio.emit('request_room_list')
 
         @self.sio.event
         def disconnect():
-            print(f"❌ {self.name} disconnected from server")
+            safe_print(f"❌ {self.name} disconnected from server")
 
         @self.sio.on('room_list_updated')
         def on_room_list_updated(data):
@@ -198,7 +214,7 @@ class PixelPlagiaristAI:
         @self.sio.on('room_created')
         def on_room_created(data):
             """Handle room creation response - AI should not create rooms."""
-            print(f"⚠️ {self.name}: Unexpected room creation event received")
+            safe_print(f"⚠️ {self.name}: Unexpected room creation event received")
 
         @self.sio.on('joined_room')
         def on_joined_room(data):
@@ -206,7 +222,7 @@ class PixelPlagiaristAI:
             self.room_id = data['room_id']
             self.player_id = data['player_id']
             self.looking_for_room = False  # Stop looking once we've joined
-            print(f"✅ {self.name} joined room {self.room_id} as player {self.player_id}")
+            safe_print(f"✅ {self.name} joined room {self.room_id} as player {self.player_id}")
 
             # Check if this room has human players after joining
             self.schedule_action(self.check_room_for_humans, delay=1.0)
@@ -215,7 +231,7 @@ class PixelPlagiaristAI:
         def on_players_updated(data):
             """Handle player list updates in the current room."""
             if self.room_id:
-                print(f"👥 {self.name}: Player list updated in room {self.room_id}")
+                safe_print(f"👥 {self.name}: Player list updated in room {self.room_id}")
                 # Check if we still have human players when the player list changes
                 self.schedule_action(self.check_current_room_for_humans, data['players'], delay=0.5)
 
@@ -223,28 +239,28 @@ class PixelPlagiaristAI:
         def on_room_left(data):
             """Handle leaving a room."""
             if data.get('success'):
-                print(f"🚪 {self.name}: Successfully left room {self.room_id}")
+                safe_print(f"🚪 {self.name}: Successfully left room {self.room_id}")
                 self.room_id = None
                 self.player_id = None
                 self.game_phase = "waiting"
                 # Start looking for a new room with human players
                 self.schedule_action(self.find_existing_room, delay=2.0)
             else:
-                print(f"❌ {self.name}: Failed to leave room - {data.get('message')}")
+                safe_print(f"❌ {self.name}: Failed to leave room - {data.get('message')}")
 
         @self.sio.on('game_started')
         def on_game_started(data):
             """Handle game start."""
             self.game_phase = "drawing"
             self.current_prompt = data['prompt']
-            print(f"🎮 {self.name}: Game started! Prompt: '{self.current_prompt}'")
+            safe_print(f"🎮 {self.name}: Game started! Prompt: '{self.current_prompt}'")
             self.schedule_action(self.draw_original)
 
         @self.sio.on('phase_changed')
         def on_phase_changed(data):
             """Handle game phase transitions."""
             self.game_phase = data['phase']
-            print(f"🔄 {self.name}: Phase changed to {self.game_phase}")
+            safe_print(f"🔄 {self.name}: Phase changed to {self.game_phase}")
 
             if self.game_phase == "drawing":
                 self.schedule_action(self.draw_original)
@@ -254,28 +270,28 @@ class PixelPlagiaristAI:
         def on_copying_assignment(data):
             """Handle copying phase assignments."""
             self.copying_targets = data['targets']
-            print(f"🎨 {self.name}: Received {len(self.copying_targets)} drawings to copy")
+            safe_print(f"🎨 {self.name}: Received {len(self.copying_targets)} drawings to copy")
             self.schedule_action(self.copy_drawings)
 
         @self.sio.on('voting_round')
         def on_voting_round(data):
             """Handle voting phase."""
             self.voting_drawings = data['drawings']
-            print(f"🗳️ {self.name}: Voting on {len(self.voting_drawings)} drawings")
+            safe_print(f"🗳️ {self.name}: Voting on {len(self.voting_drawings)} drawings")
             self.schedule_action(self.vote_randomly)
 
         @self.sio.on('voting_round_excluded')
         def on_voting_round_excluded(data):
             """Handle when AI is excluded from voting (drew or copied in the set)."""
-            print(f"⏭️ {self.name}: Excluded from voting - {data['reason']}")
+            safe_print(f"⏭️ {self.name}: Excluded from voting - {data['reason']}")
 
         @self.sio.on('game_results')
         def on_game_results(data):
             """Handle game end and results."""
-            print(f"🏆 {self.name}: Game finished!")
+            safe_print(f"🏆 {self.name}: Game finished!")
             final_balances = data.get('final_balances', {})
             final_tokens = final_balances.get(self.player_id, 0)
-            print(f"💰 {self.name}: Final tokens: {final_tokens}")
+            safe_print(f"💰 {self.name}: Final tokens: {final_tokens}")
 
             # Stay connected and look for new rooms to join
             self.game_phase = "waiting"
@@ -285,7 +301,7 @@ class PixelPlagiaristAI:
         def on_error(data):
             """Handle server errors."""
             error_msg = data.get('message', 'Unknown error')
-            print(f"❌ {self.name}: Server error - {error_msg}")
+            safe_print(f"❌ {self.name}: Server error - {error_msg}")
 
             # If room not found, try again after delay
             if 'Room not found' in error_msg or 'full' in error_msg.lower():
@@ -324,7 +340,7 @@ class PixelPlagiaristAI:
         if not self.room_id:
             return
 
-        print(f"🔍 {self.name}: Checking room {self.room_id} for human players...")
+        safe_print(f"🔍 {self.name}: Checking room {self.room_id} for human players...")
         # Request current room list to get updated player information
         self.sio.emit('request_room_list')
 
@@ -352,29 +368,29 @@ class PixelPlagiaristAI:
             else:
                 human_players.append(username)
 
-        print(
+        safe_print(
             f"👥 {self.name}: Room {self.room_id} has {len(human_players)} human players and "
             f"{len(ai_players)} AI players")
-        print(f"   Humans: {human_players}")
-        print(f"   AIs: {ai_players}")
+        safe_print(f"   Humans: {human_players}")
+        safe_print(f"   AIs: {ai_players}")
 
         if len(human_players) == 0:
             # Room has no human players - leave it
-            print(f"🚪 {self.name}: Leaving room {self.room_id} - no human players remaining")
+            safe_print(f"🚪 {self.name}: Leaving room {self.room_id} - no human players remaining")
             self.leave_room()
         else:
-            print(f"✅ {self.name}: Staying in room {self.room_id} - found {len(human_players)} human player(s)")
+            safe_print(f"✅ {self.name}: Staying in room {self.room_id} - found {len(human_players)} human player(s)")
 
     def leave_room(self):
         """
         Leave the current room and start looking for a new one with human players.
         """
         if self.room_id and self.game_phase == "waiting":
-            print(f"🚪 {self.name}: Leaving room {self.room_id} to find humans...")
+            safe_print(f"🚪 {self.name}: Leaving room {self.room_id} to find humans...")
             self.looking_for_room = True
             self.sio.emit('leave_room')
         else:
-            print(f"❌ {self.name}: Cannot leave room - either not in a room or game in progress")
+            safe_print(f"❌ {self.name}: Cannot leave room - either not in a room or game in progress")
 
     def try_join_available_room(self):
         """
@@ -382,7 +398,7 @@ class PixelPlagiaristAI:
         Prioritizes rooms that are waiting for players and contain human players.
         """
         if not self.available_rooms:
-            print(f"📭 {self.name}: No available rooms found, waiting...")
+            safe_print(f"📭 {self.name}: No available rooms found, waiting...")
             self.looking_for_room = False  # Stop looking temporarily
             # Try again after a delay
             self.schedule_action(self.find_existing_room, delay=10.0)
@@ -399,7 +415,7 @@ class PixelPlagiaristAI:
             best_room = max(suitable_rooms, key=lambda r: r['player_count'])
             room_id = best_room['room_id']
 
-            print(f"🎯 {self.name}: Attempting to join room {room_id} "
+            safe_print(f"🎯 {self.name}: Attempting to join room {room_id} "
                   f"({best_room['player_count']}/{best_room['max_players']} players) "
                   f"with human players")
 
@@ -418,11 +434,11 @@ class PixelPlagiaristAI:
         
         Now includes shape variety and basic prompt awareness.
         """
-        print(f"✏️ {self.name}: Drawing original artwork for '{self.current_prompt}'")
+        safe_print(f"✏️ {self.name}: Drawing original artwork for '{self.current_prompt}'")
 
         # Choose shape based on prompt and variety
         chosen_shape = choose_drawing_shape(self.current_prompt)
-        print(f"🎨 {self.name}: Chose to draw a {chosen_shape}")
+        safe_print(f"🎨 {self.name}: Chose to draw a {chosen_shape}")
 
         drawing_data = self.create_simple_drawing(chosen_shape)
 
@@ -438,11 +454,11 @@ class PixelPlagiaristAI:
         """
         for target in self.copying_targets:
             target_id = target['target_id']
-            print(f"🎨 {self.name}: Copying drawing from player {target_id}")
+            safe_print(f"🎨 {self.name}: Copying drawing from player {target_id}")
 
             # Use variety for copies too - could analyze original in the future
             chosen_shape = choose_drawing_shape()
-            print(f"🎨 {self.name}: Chose to copy with a {chosen_shape}")
+            safe_print(f"🎨 {self.name}: Chose to copy with a {chosen_shape}")
             copy_data = self.create_simple_drawing(chosen_shape)
 
             self.sio.emit('submit_copy', {
@@ -468,7 +484,7 @@ class PixelPlagiaristAI:
         if self.voting_drawings:
             chosen_drawing = random.choice(self.voting_drawings)
             drawing_id = chosen_drawing['id']
-            print(f"🗳️ {self.name}: Voting for drawing {drawing_id}")
+            safe_print(f"🗳️ {self.name}: Voting for drawing {drawing_id}")
 
             self.sio.emit('submit_vote', {'drawing_id': drawing_id})
 
@@ -559,11 +575,11 @@ class PixelPlagiaristAI:
                 raise ValueError("Generated image data too small")
 
             result = f"data:image/png;base64,{image_data}"
-            print(f"✅ {PixelPlagiaristAI.__name__}: Created {shape} drawing ({len(image_data)} bytes)")
+            safe_print(f"✅ {PixelPlagiaristAI.__name__}: Created {shape} drawing ({len(image_data)} bytes)")
             return result
             
         except Exception as e:
-            print(f"⚠️ Error creating {shape} drawing: {e}")
+            safe_print(f"⚠️ Error creating {shape} drawing: {e}")
             # Return a guaranteed working fallback
             return PixelPlagiaristAI.create_guaranteed_fallback()
 
@@ -596,11 +612,11 @@ class PixelPlagiaristAI:
             image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
             
             result = f"data:image/png;base64,{image_data}"
-            print(f"✅ Fallback: Created guaranteed black square ({len(image_data)} bytes)")
+            safe_print(f"✅ Fallback: Created guaranteed black square ({len(image_data)} bytes)")
             return result
             
         except Exception as e:
-            print(f"❌ Even guaranteed fallback failed: {e}")
+            safe_print(f"❌ Even guaranteed fallback failed: {e}")
             # Last resort: return a minimal valid base64 PNG with visible content
             # This is a 1x1 black pixel PNG encoded in base64
             return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg=="
@@ -608,38 +624,38 @@ class PixelPlagiaristAI:
     def connect_to_server(self):
         """Connect to the game server."""
         url = f"{'https' if self.use_ssl else 'http'}://{self.host}:{self.port}"
-        print(f"🚀 {self.name}: Connecting to {url}")
+        safe_print(f"🚀 {self.name}: Connecting to {url}")
 
         try:
             self.sio.connect(url)
             return True
         except Exception as e:
-            print(f"❌ {self.name}: Failed to connect - {e}")
+            safe_print(f"❌ {self.name}: Failed to connect - {e}")
             return False
 
     def disconnect(self):
         """Disconnect from the server."""
         if self.sio.connected:
             self.sio.disconnect()
-            print(f"👋 {self.name}: Disconnected")
+            safe_print(f"👋 {self.name}: Disconnected")
 
     def run(self):
         """Main execution loop for the AI player."""
         if self.connect_to_server():
-            print(f"🤖 {self.name}: AI player is running...")
+            safe_print(f"🤖 {self.name}: AI player is running...")
             self.running = True
             try:
                 # Keep the AI running with properly interruptible loop
                 while self.running and not self.should_stop and not shutdown_event.is_set():
                     time.sleep(0.1)  # Use regular sleep for better interrupt handling
             except KeyboardInterrupt:
-                print(f"\n⏹️ {self.name}: Shutting down...")
+                safe_print(f"\n⏹️ {self.name}: Shutting down...")
             finally:
                 self.running = False
                 self.should_stop = True
                 self.disconnect()
         else:
-            print(f"💥 {self.name}: Failed to start AI player")
+            safe_print(f"💥 {self.name}: Failed to start AI player")
 
     def stop(self):
         """Stop the AI player gracefully."""
@@ -681,13 +697,13 @@ def main():
         ai.run()
     else:
         # Multiple AI players
-        print(f"🚀 Spawning {args.count} AI players...")
+        safe_print(f"🚀 Spawning {args.count} AI players...")
         ais = []
         threads = []
 
         def cleanup_ais():
             """Clean up all AI players."""
-            print(f"\n⏹️ Shutting down all AI players...")
+            safe_print(f"\n⏹️ Shutting down all AI players...")
             shutdown_event.set()
             for ai in ais:
                 ai.stop()
@@ -713,12 +729,12 @@ def main():
             time.sleep(0.5)
 
         try:
-            print(f"🤖 {args.count} AI players running. Press Ctrl+C to stop.")
+            safe_print(f"🤖 {args.count} AI players running. Press Ctrl+C to stop.")
             # Wait for shutdown event or threads to complete
             while not shutdown_event.is_set() and any(t.is_alive() for t in threads):
                 time.sleep(0.1)
         except KeyboardInterrupt:
-            print(f"\n⏹️ Received Ctrl+C, shutting down...")
+            safe_print(f"\n⏹️ Received Ctrl+C, shutting down...")
             shutdown_event.set()
         finally:
             # Ensure cleanup happens

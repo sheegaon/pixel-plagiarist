@@ -35,7 +35,10 @@ def get_timer_config():
         - review: Time allowed for reviewing original drawings
     """
     if CONSTANTS['testing_mode']:
-        print("🧪 TESTING MODE ENABLED - All timers set to 2 seconds")
+        try:
+            print("🧪 TESTING MODE ENABLED - All timers set to 2 seconds")
+        except UnicodeEncodeError:
+            print("TESTING MODE ENABLED - All timers set to 2 seconds")
         return {
             'joining': 2,
             'drawing': 2,

@@ -125,3 +125,16 @@ def debug_log(message, player_id=None, room_id=None, extra_data=None):
 
         logger = logging.getLogger(__name__)
         logger.info(" | ".join(log_parts))
+
+
+def info_log(message):
+    """
+    Log debug information if debug mode is enabled.
+
+    Parameters
+    ----------
+    message : str
+        The message to log
+    """
+    logger = logging.getLogger(__name__)
+    logger.info(message)
