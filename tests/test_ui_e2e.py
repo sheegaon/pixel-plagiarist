@@ -128,7 +128,7 @@ def server_process():
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=r"w:/tfishman/code/qr-fi-isa/pixel_plagiarist"  # Path(__file__).parent.parent  # Run from project root
+        cwd=Path(__file__).parent.parent
     )
     import time
 
