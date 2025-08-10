@@ -9,6 +9,7 @@ These tests simulate real user interactions with the game including:
 - Complete game flow with AI players
 
 Run with: pytest tests/test_ui_e2e.py -v -s --log-cli-level=INFO --full-trace
+pytest .\tests\test_ui_e2e.py::TestRoomManagement::test_create_bronze_room -v -s --log-cli-level=INFO --full-trace
 """
 
 import pytest
@@ -33,7 +34,7 @@ SERVER_HOST = "localhost"
 SERVER_PORT = 5002  # Use different port for testing
 BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
 CHROME_DRIVER_PATH = os.path.join(os.path.dirname(__file__), "chromedriver.exe")
-setup_logging()
+setup_logging(file_root='test_ui')
 
 
 class TestFixtures:
@@ -163,7 +164,7 @@ def server_process():
 def chrome_driver():
     """Create Chrome WebDriver instance for each test"""
     options = Options()
-    options.add_argument("--headless")  # Run headless for CI
+    # options.add_argument("--headless")  # Run headless for CI
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")

@@ -26,6 +26,11 @@ class CopyingPhase:
 
     def start_phase(self, socketio):
         """Start the copying phase with immediate review overlay"""
+        # Check if game has ended early - if so, don't start copying phase
+        if self.game.phase == "ended_early":
+            debug_log("Skipping copying phase - game has ended early", None, self.game.room_id)
+            return
+            
         # Allow restarting for new games - only prevent duplicate calls within same game
         if self.phase_started and self.game.phase == "copying":
             debug_log("Copying phase already started, skipping duplicate call", None, self.game.room_id)

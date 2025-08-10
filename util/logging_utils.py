@@ -6,7 +6,7 @@ from datetime import datetime
 from util.config import CONSTANTS
 
 
-def setup_logging():
+def setup_logging(file_root='pixel_plagiarist'):
     """
     Configure logging for the application.
     
@@ -16,9 +16,9 @@ def setup_logging():
         Configured logger instance
     """
     # Configure logging
-    log_folder = os.path.join(os.getcwd(), 'logs')
+    log_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
     os.makedirs(log_folder, exist_ok=True)
-    log_file_path = os.path.join(log_folder, f'pixel_plagiarist_{datetime.now():%Y-%m-%d_%H%M%S}.log')
+    log_file_path = os.path.join(log_folder, f'{file_root}_{datetime.now():%Y-%m-%d_%H%M%S}.log')
     
     logging.basicConfig(
         level=logging.INFO,

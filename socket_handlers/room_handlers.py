@@ -47,7 +47,7 @@ class RoomHandlers:
                     debug_log("Starting game immediately - max players reached", None, room_id,
                               {'player_count': len(game.players)})
                     game.start_game(self.socketio)
-                elif game.timer.start_timer is None:
+                elif game.timer.countdown_timer is None:
                     debug_log("Starting countdown - min players reached", None, room_id,
                               {'player_count': len(game.players)})
                     game.timer.start_joining_countdown(self.socketio)
@@ -106,7 +106,7 @@ class RoomHandlers:
                         debug_log("Starting game immediately - max players reached", None, room_id,
                                   {'player_count': len(game.players)})
                         game.start_game(self.socketio)
-                    elif game.timer.start_timer is None:
+                    elif game.timer.countdown_timer is None:
                         debug_log("Starting countdown - min players reached", None, room_id,
                                   {'player_count': len(game.players)})
                         game.timer.start_joining_countdown(self.socketio)

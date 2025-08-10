@@ -109,7 +109,7 @@ else:
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Set up logging
-logger = setup_logging()
+logger = setup_logging(file_root='server')
 
 # Set up Socket.IO event handlers
 setup_socket_handlers(socketio)

@@ -57,6 +57,7 @@ class GameManager {
         if (data.success) {
             roomManager.setCurrentRoom(data.room_id);
             playerManager.setPlayerId(socketHandler.socket.id);
+            playerManager.updatePlayerList([]);
             gameStateManager.setPhase(GameConfig.PHASES.WAITING);
             uiManager.showSuccess(data.message);
             uiManager.showView('waiting');

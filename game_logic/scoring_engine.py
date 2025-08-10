@@ -29,6 +29,11 @@ class ScoringEngine:
         ----------
         socketio : SocketIO
         """
+        # Check if game has ended early - if so, don't calculate results
+        if self.game.phase == "ended_early":
+            debug_log("Skipping results calculation - game has ended early", None, self.game.room_id)
+            return
+            
         # Prevent duplicate calculations
         if self.results_calculated:
             debug_log("Results already calculated, skipping duplicate call", None, self.game.room_id)

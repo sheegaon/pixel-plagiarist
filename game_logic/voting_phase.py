@@ -1,23 +1,9 @@
 # Voting phase logic for Pixel Plagiarist
 import random
+from PIL import Image
+import io
+import base64
 from util.logging_utils import debug_log
-
-# Create a simple 400x300 white canvas as base64 PNG
-BLANK_CANVAS = (
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAYAAADtt+XCAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAA"
-    "AHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVHic7cExAQAAAMKg9U9tCj+gAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAA/wMaogABCUUNmgAAAABJRU5ErkJggg==")
 
 
 class VotingPhase:
@@ -42,6 +28,11 @@ class VotingPhase:
 
     def start_phase(self, socketio):
         """Start the voting phase"""
+        # Check if game has ended early - if so, don't start voting phase
+        if self.game.phase == "ended_early":
+            debug_log("Skipping voting phase - game has ended early", None, self.game.room_id)
+            return
+            
         # Prevent duplicate phase starts
         if self.game.phase == "voting" and self.drawing_sets_created:
             debug_log("Voting phase already started, skipping duplicate call", None, self.game.room_id)
@@ -102,13 +93,20 @@ class VotingPhase:
                     })
                     copies_found += 1
                 else:
+                    # Create a simple 400x300 white canvas as base64 PNG
+                    img = Image.new('RGB', (400, 300), 'white')
+                    buffer = io.BytesIO()
+                    img.save(buffer, format='PNG')
+                    buffer.seek(0)
+                    img_str = base64.b64encode(buffer.getvalue()).decode()
+
                     # Player didn't submit a copy - add blank canvas
                     drawing_set['drawings'].append({
                         'id': f"copy_{copier_id}_{original_player_id}",
                         'player_id': copier_id,
                         'type': 'copy',
                         'target_id': original_player_id,
-                        'drawing': BLANK_CANVAS,
+                        'drawing': f'data:image/png;base64,{img_str}',
                     })
                     copies_found += 1
 

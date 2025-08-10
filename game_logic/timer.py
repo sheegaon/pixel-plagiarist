@@ -21,14 +21,13 @@ class Timer:
             Reference to the main game instance
         """
         self.game = game
-        self.start_timer = None
         self.countdown_timer = None
         self.phase_timer = None
     
     def start_joining_countdown(self, socketio):
         """Start countdown for more players to join using configured timer"""
         # Prevent duplicate countdown starts
-        if self.start_timer is not None:
+        if self.countdown_timer is not None:
             debug_log("Countdown already running, skipping duplicate start", None, self.game.room_id)
             return
 

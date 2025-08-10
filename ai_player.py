@@ -39,9 +39,12 @@ import sys
 import atexit
 from PIL import Image, ImageDraw
 import socketio
+from util.logging_utils import info_log, setup_logging
 
 # Global shutdown flag for clean exit
 shutdown_event = threading.Event()
+
+setup_logging(file_root='ai_player')
 
 
 def safe_print(message):
@@ -57,7 +60,15 @@ def safe_print(message):
         print(message)
     except UnicodeEncodeError:
         # Fallback for environments that don't support certain characters
-        print(message.encode('utf-8', errors='replace').decode('utf-8', errors='replace'))
+        message = message.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        print(message)
+
+    try:
+        info_log(message)
+    except UnicodeEncodeError:
+        # Fallback for environments that don't support certain characters
+        message = message.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        info_log(message)
 
 
 def signal_handler(signum, frame):
@@ -390,7 +401,7 @@ class PixelPlagiaristAI:
         Only executes if connected.
         """
         if not self.connected:
-            safe_print(f"⚠️ {self.name}: Cannot search for rooms - not connected")
+            self.connect_to_server()
             return
 
         self.looking_for_room = True  # Set flag to indicate active search

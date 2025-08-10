@@ -56,7 +56,6 @@ class GameStateGL:
         self.player_balances_before_game = {}
 
         # Countdown management
-        self.start_timer = None
         self.countdown_timer = None
         self.countdown_start_time = None
         self._stop_countdown = False
@@ -252,6 +251,11 @@ class GameStateGL:
 
     def end_game_early(self, socketio=None):
         """End game early due to insufficient players"""
+        # Cancel all active timers to prevent further phase transitions
+        if hasattr(self, 'timer'):
+            self.timer.cancel_phase_timer()
+            self.timer.stop_joining_countdown()
+        
         if len(self.players) < self.min_players:
             remaining_players = list(self.players.keys())
             
