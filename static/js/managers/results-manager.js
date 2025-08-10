@@ -33,7 +33,7 @@ class ResultsManager {
                     body: JSON.stringify({ balance: balance })
                 });
                 if (response.ok) {
-                    console.log(`Saved balance for ${window.gameUserData.username}: ${balance} Pixel Pts`);
+                    console.log(`Saved balance for ${window.gameUserData.username}: ${balance} Bits`);
                 } else {
                     console.warn('Failed to save player balance to server');
                 }
@@ -98,7 +98,7 @@ class ResultsManager {
                     <div class="rank">${index + 1}</div>
                     <div class="player-info">
                         <span class="name">${player.name}${isCurrentPlayer ? ' (You)' : ''}</span>
-                        <span class="tokens">${Math.round(player.tokens)} Pixel Pts</span>
+                        <span class="tokens">${Math.round(player.tokens)} Bits</span>
                     </div>
                     ${index === 0 ? '<div class="crown">👑</div>' : ''}
                 </div>

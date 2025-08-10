@@ -361,7 +361,6 @@ class VotingPhase:
     def check_early_advance(self, socketio):
         """Check if all eligible voters have voted and advance early if possible"""
         n = len(self.game.drawing_sets)
-        # Check if all eligible voters have voted for current set
         current_set = (self.game.drawing_sets[self.game.idx_current_drawing_set]
                        if self.game.idx_current_drawing_set < n else None)
         if current_set:
@@ -372,25 +371,16 @@ class VotingPhase:
             # Check if all eligible voters have voted
             all_voted = all(voter_id in set_votes for voter_id in eligible_voters)
             
-            # Only advance early if we have eligible voters and they've all voted
-            # AND we've been in this voting set for at least 5 seconds to prevent rapid transitions
-            if all_voted and len(eligible_voters) > 0:
-                # Add minimum time check to prevent rapid transitions
-                import time
-                current_time = time.time()
-                if not hasattr(self, 'set_start_time'):
-                    self.set_start_time = current_time
-                
-                # Require at least 5 seconds in this voting set before advancing
-                if current_time - self.set_start_time >= 5:
-                    debug_log(
-                        "All eligible players have voted - advancing to next voting set early", None, self.game.room_id)
-                    # Cancel current timer
-                    self.game.timer.cancel_phase_timer()
-                    socketio.emit('early_phase_advance', {
-                        'next_phase': 'next_voting_set' if self.game.idx_current_drawing_set + 1 < n else 'results',
-                        'reason': 'All eligible players have voted'
-                    }, room=self.game.room_id)
-                    self.next_voting_set(socketio)
-                    return True
+            # Advance immediately if all eligible voters have voted, or if there are no eligible voters
+            if all_voted or len(eligible_voters) == 0:
+                debug_log(
+                    "All eligible players have voted - advancing to next voting set early", None, self.game.room_id)
+                # Cancel current timer
+                self.game.timer.cancel_phase_timer()
+                socketio.emit('early_phase_advance', {
+                    'next_phase': 'next_voting_set' if self.game.idx_current_drawing_set + 1 < n else 'results',
+                    'reason': 'All eligible players have voted' if len(eligible_voters) > 0 else 'No eligible voters in this set'
+                }, room=self.game.room_id)
+                self.next_voting_set(socketio)
+                return True
         return False

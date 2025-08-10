@@ -50,6 +50,12 @@ class CopyingPhase:
             self._assign_copying_tasks()
             self.assignments_made = True
 
+        # Reset copy progress for this copying phase
+        for pid in self.game.players:
+            self.game.players[pid]['completed_copies'] = 0
+        # Clear any previous copied drawings from earlier phases/games
+        self.game.copied_drawings = {}
+
         # Send assignments to players and start copying immediately
         self._send_copying_phase(socketio)
 
@@ -158,7 +164,10 @@ class CopyingPhase:
         player_completion = {}
         for player_id, player in self.game.players.items():
             completed = player.get('completed_copies', 0)
-            required = len(player.get('copies_to_make', []))
+            copies_list = player.get('copies_to_make', [])
+            # Only count targets that actually have an original drawing available
+            valid_targets = [tid for tid in copies_list if tid in self.game.original_drawings]
+            required = len(valid_targets)
             player_completion[player_id] = {
                 'completed': completed,
                 'required': required,
@@ -174,7 +183,6 @@ class CopyingPhase:
         })
         
         if all_copied:
-            # Add minimum time check to prevent rapid transitions
             import time
             current_time = time.time()
             if not hasattr(self, 'phase_start_time'):

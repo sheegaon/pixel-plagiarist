@@ -320,7 +320,7 @@ class GameManager {
             const element = document.getElementById(id);
             if (element) {
                 if (id === 'roomInfo') element.textContent = 'Room: -';
-                else if (id === 'balanceInfo') element.textContent = `Balance: ${GameConfig.INITIAL_BALANCE} Pixel Pts`;
+                else if (id === 'balanceInfo') element.textContent = `Balance: ${GameConfig.INITIAL_BALANCE} Bits`;
                 else element.textContent = '';
             }
         });
