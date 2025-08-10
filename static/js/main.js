@@ -82,9 +82,13 @@ class PixelPlagiarist {
         const initOrder = [
             { name: 'socketHandler', instance: socketHandler, init: () => socketHandler.init() },
             { name: 'drawingCanvas', instance: drawingCanvas, init: () => drawingCanvas.init() },
-            { name: 'uiManager', instance: uiManager, init: () => {
-                uiManager.initResponsive();
-                uiManager.setupKeyboardNavigation();
+            { name: 'uiManager', instance: (typeof uiManager !== 'undefined' ? uiManager : null), init: () => {
+                if (typeof uiManager !== 'undefined') {
+                    uiManager.initResponsive();
+                    uiManager.setupKeyboardNavigation();
+                } else {
+                    console.warn('uiManager not available during initialization');
+                }
             }},
             { name: 'gameManager', instance: window.gameManager, init: () => {
                 // Game manager and its sub-managers are now properly initialized
@@ -214,18 +218,23 @@ class PixelPlagiarist {
     }
 
     getDebugInfo() {
+        const hasGM = typeof window !== 'undefined' && typeof window.gameManager !== 'undefined' && window.gameManager;
+        const hasCanvas = typeof drawingCanvas !== 'undefined' && drawingCanvas;
+        const hasUI = typeof uiManager !== 'undefined' && uiManager;
+        const hasSocket = typeof socketHandler !== 'undefined' && socketHandler;
+
         return {
             initialized: this.initialized,
             moduleCount: this.modules.size,
             eventListenerCount: this.eventListeners.length,
-            gamePhase: gameManager ? gameManager.gamePhase : 'unknown',
-            currentRoom: gameManager ? gameManager.currentRoom : null,
-            playerId: gameManager ? gameManager.playerId : null,
-            balance: gameManager ? gameManager.currentBalance : 0,
-            copyTargets: gameManager ? gameManager.copyTargets.length : 0,
-            canvasStrokes: drawingCanvas ? drawingCanvas.strokes.length : 0,
-            activeTimers: uiManager ? uiManager.timers.size : 0,
-            socketConnected: socketHandler ? socketHandler.connected : false
+            gamePhase: hasGM ? window.gameManager.gamePhase : 'unknown',
+            currentRoom: hasGM ? window.gameManager.currentRoom : null,
+            playerId: hasGM ? window.gameManager.playerId : null,
+            balance: hasGM ? window.gameManager.currentBalance : 0,
+            copyTargets: hasGM ? window.gameManager.copyTargets.length : 0,
+            canvasStrokes: hasCanvas ? drawingCanvas.strokes.length : 0,
+            activeTimers: hasUI ? uiManager.timers.size : 0,
+            socketConnected: hasSocket ? socketHandler.connected : false
         };
     }
 
@@ -279,11 +288,12 @@ document.addEventListener('DOMContentLoaded', function() {
         window.pixelPlagiarist.init();
         
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            console.log('Debug mode enabled. Use pixelPlagiarist.getDebugInfo() for debugging.');
-            window.debug = () => window.pixelPlagiarist.getDebugInfo();
+            console.log('Debug mode enabled. Use pixelPlagiarist.getDebugInfo() for structured state.');
+            // Provide a lightweight logger that won’t touch not-yet-initialized globals
+            window.debug = (...args) => { try { console.log('[debug]', ...args); } catch (e) {} };
         }
         else {
-            window.debug = (message) => {};
+            window.debug = () => {};
         }
     } catch (error) {
         console.error('Critical initialization error:', error);

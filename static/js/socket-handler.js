@@ -38,12 +38,76 @@ class SocketHandler {
     }
 
     setupSocketEvents() {
+        // Debug helpers for detailed console logging
+        const debugSnapshot = () => {
+            try {
+                const hasGameManager = typeof window !== 'undefined' && typeof window.gameManager !== 'undefined';
+                const hasUI = typeof uiManager !== 'undefined';
+                const hasRoom = typeof roomManager !== 'undefined';
+                const hasPlayer = typeof playerManager !== 'undefined';
+                return {
+                    phase: hasGameManager ? window.gameManager.gamePhase : 'unknown',
+                    view: hasUI ? uiManager.getCurrentView() : 'unknown',
+                    room: hasRoom ? roomManager.getCurrentRoom() : null,
+                    playerId: hasPlayer ? playerManager.getPlayerId() : null,
+                    socketId: this.socket ? this.socket.id : null,
+                    timers: hasUI ? Array.from(uiManager.timers.keys()) : []
+                };
+            } catch (e) {
+                return { error: e.message };
+            }
+        };
+        const logEvent = (name, data) => {
+            try {
+                console.log(`📡 Socket event received: ${name}`, data);
+                console.log('🧭 UI snapshot:', debugSnapshot());
+            } catch (e) {
+                console.warn('Logging error:', e);
+            }
+        };
+
         // Connection events
         this.socket.on('connect', this.registerHandler('connect', () => {
             this.connected = true;
             console.log('Connected to server');
+            console.log('🧭 UI snapshot (on connect):', debugSnapshot());
+
+            // Always refresh room list
             this.emit('request_room_list');
+
+            // Auto-rejoin if we have a known room locally (helps after reconnect on macOS)
+            try {
+                const currentRoom =
+                    (typeof roomManager !== 'undefined' && typeof roomManager.getCurrentRoom === 'function')
+                        ? roomManager.getCurrentRoom()
+                        : (typeof window !== 'undefined' && window.gameManager ? window.gameManager.currentRoom : null);
+
+                if (currentRoom) {
+                    const username =
+                        (typeof window !== 'undefined' && window.gameManager && window.gameManager.username)
+                            ? window.gameManager.username
+                            : (typeof window !== 'undefined' && window.gameUserData ? window.gameUserData.username : 'Anonymous');
+
+                    console.log('🔁 Attempting auto-rejoin to room:', currentRoom);
+                    this.emit('join_room', { room_id: currentRoom, username });
+                }
+            } catch (e) {
+                console.warn('Auto-rejoin attempt failed:', e);
+            }
         }));
+
+        // Reconnect diagnostics
+        if (this.socket && this.socket.io) {
+            this.socket.io.on('reconnect', (attempt) => {
+                console.log(`🔌 Reconnected after ${attempt} attempt(s)`, debugSnapshot());
+            });
+            this.socket.io.on('reconnect_attempt', (attempt) => {
+                console.log(`🔎 Reconnect attempt ${attempt}`, debugSnapshot());
+            });
+            this.socket.io.on('reconnect_error', (err) => {
+                console.warn('⚠️ Reconnect error:', err && err.message ? err.message : err);
+            });
+        }
 
         this.socket.on('disconnect', this.registerHandler('disconnect', () => {
             this.connected = false;
@@ -74,6 +138,8 @@ class SocketHandler {
 
         // Game flow events - delegate to GameManager
         this.socket.on('joining_countdown_started', this.registerHandler('joining_countdown_started', (data) => {
+            if (typeof logEvent === 'function') logEvent('joining_countdown_started', data);
+            if (typeof logEvent === 'function') logEvent('joining_countdown_started', data);
             if (window.gameManager) window.gameManager.handleCountdownStarted(data);
         }));
 
@@ -81,12 +147,56 @@ class SocketHandler {
             if (window.gameManager) window.gameManager.handleCountdownCancelled(data);
         }));
 
+        this.socket.on('countdown_finished', this.registerHandler('countdown_finished', (data) => {
+            // Handle countdown completion from server - this ensures proper synchronization
+            console.log('Server countdown completed, game should start shortly...');
+            const timer = document.getElementById('joiningTimer');
+            if (timer) {
+                timer.textContent = data.message || "Starting...";
+            }
+            // Clear any client-side countdown timers to prevent conflicts
+            if (window.uiManager && uiManager.timers.has('joiningTimer')) {
+                clearInterval(uiManager.timers.get('joiningTimer'));
+                uiManager.timers.delete('joiningTimer');
+            }
+        }));
+
+        this.socket.on('game_start_error', this.registerHandler('game_start_error', (data) => {
+            // Handle game start errors - helps debug timing issues
+            console.error('Game failed to start:', data.message);
+            uiManager.showError(data.message);
+            // Reset the timer display
+            const timer = document.getElementById('joiningTimer');
+            if (timer) {
+                timer.textContent = "Error starting game";
+            }
+        }));
+
         this.socket.on('game_started', this.registerHandler('game_started', (data) => {
-            if (window.gameManager) window.gameManager.handleGameStarted(data);
+            if (typeof logEvent === 'function') logEvent('game_started', data);
+            if (window.gameManager) {
+                window.gameManager.handleGameStarted(data);
+                // Log post-handler state
+                console.log('✅ game_started handled. Post-state snapshot:', {
+                    view: window.uiManager ? uiManager.getCurrentView() : 'unknown',
+                    phase: window.gameManager ? window.gameManager.gamePhase : 'unknown'
+                });
+            } else {
+                console.warn('gameManager not initialized when game_started received');
+            }
         }));
 
         this.socket.on('phase_changed', this.registerHandler('phase_changed', (data) => {
-            if (window.gameManager) window.gameManager.handlePhaseChanged(data);
+            if (typeof logEvent === 'function') logEvent('phase_changed', data);
+            if (window.gameManager) {
+                window.gameManager.handlePhaseChanged(data);
+                console.log('✅ phase_changed handled. New phase/view:', {
+                    phase: window.gameManager ? window.gameManager.gamePhase : 'unknown',
+                    view: window.uiManager ? uiManager.getCurrentView() : 'unknown'
+                });
+            } else {
+                console.warn('gameManager not initialized when phase_changed received');
+            }
         }));
 
         // Drawing and copying events - delegate to GameManager

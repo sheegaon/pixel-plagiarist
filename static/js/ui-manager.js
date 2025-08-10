@@ -7,16 +7,39 @@ class UIManager {
 
     // Screen/View management
     showScreen(screenId) {
-        document.querySelectorAll('.screen').forEach(screen => {
+        const screens = document.querySelectorAll('.screen');
+        const target = document.getElementById(screenId);
+        console.log(`🖥️ showScreen: switching to ${screenId}, foundScreens=${screens.length}, targetFound=${!!target}`);
+        screens.forEach(screen => {
             screen.classList.remove('active');
         });
-        document.getElementById(screenId).classList.add('active');
+        if (!target) {
+            console.warn(`⚠️ showScreen: target ${screenId} not found`);
+            return;
+        }
+        target.classList.add('active');
         this.currentView = screenId.replace('Screen', '');
     }
 
     showView(viewName) {
-        const screenId = viewName + 'Screen';
-        this.showScreen(screenId);
+        const prevView = this.getCurrentView();
+                const prevViewName = this.getCurrentView();
+                const screenId = viewName + 'Screen';
+                this.showScreen(screenId);
+                try {
+                    const phase = (typeof window !== 'undefined' && typeof window.gameManager !== 'undefined')
+                        ? window.gameManager.gamePhase
+                        : 'unknown';
+                    console.log(`🧩 UI view change: ${prevViewName} -> ${viewName} (phase: ${phase})`);
+            } catch (e) {
+                console.warn('Error logging view change:', e);
+            }
+        try {
+            const phase = window.gameManager ? window.gameManager.gamePhase : 'unknown';
+            console.log(`🧩 UI view change: ${prevView} -> ${viewName} (phase: ${phase})`);
+        } catch (e) {
+            console.warn('Error logging view change:', e);
+        }
     }
 
     getCurrentView() {
@@ -79,7 +102,17 @@ class UIManager {
 
     startCountdown(seconds) {
         const timer = document.getElementById('joiningTimer');
+        if (!timer) {
+            console.warn('Joining timer element not found');
+            return;
+        }
+        
         let timeLeft = seconds;
+        
+        // Clear any existing countdown timer
+        if (this.timers.has('joiningTimer')) {
+            clearInterval(this.timers.get('joiningTimer'));
+        }
         
         // Set initial value immediately
         timer.textContent = timeLeft;
@@ -90,9 +123,23 @@ class UIManager {
             
             if (timeLeft <= 0) {
                 clearInterval(interval);
+                this.timers.delete('joiningTimer');
                 timer.textContent = "Starting...";
+                
+                // Add a small delay before assuming the game should start
+                // This helps with timing synchronization between client and server
+                setTimeout(() => {
+                    // If we're still showing "Starting..." after a reasonable delay,
+                    // it might indicate a timing issue - log it for debugging
+                    if (timer.textContent === "Starting...") {
+                        console.log('Countdown completed, waiting for server to start game...');
+                    }
+                }, 2000);
             }
         }, 1000);
+        
+        // Store the interval so it can be properly cleared
+        this.timers.set('joiningTimer', interval);
     }
 
     showReviewOverlay(drawing, duration) {

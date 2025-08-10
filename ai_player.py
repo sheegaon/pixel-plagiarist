@@ -57,13 +57,6 @@ def safe_print(message):
         The message to print
     """
     try:
-        print(message)
-    except UnicodeEncodeError:
-        # Fallback for environments that don't support certain characters
-        message = message.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
-        print(message)
-
-    try:
         info_log(message)
     except UnicodeEncodeError:
         # Fallback for environments that don't support certain characters
@@ -194,8 +187,20 @@ class PixelPlagiaristAI:
         self.response_delay_range = (0.5, 2.0)  # Random response timing
         self.drawing_complexity = "simple"  # Can be enhanced later
 
-        # Socket.IO client
-        self.sio = socketio.Client()
+        # Socket.IO client with Mac-specific configuration
+        import platform
+        if platform.system() == 'Darwin':  # macOS
+            # Use specific transport and connection settings for macOS
+            self.sio = socketio.Client(
+                reconnection=True,
+                reconnection_attempts=5,
+                reconnection_delay=1,
+                reconnection_delay_max=5,
+                logger=False,
+                engineio_logger=False
+            )
+        else:
+            self.sio = socketio.Client()
         self.setup_event_handlers()
 
         # Pending timers to cancel if needed
@@ -209,10 +214,22 @@ class PixelPlagiaristAI:
         @self.sio.event
         def connect():
             self.connected = True
-            safe_print(f"🔗 {self.name} connected to server")
-            # Request room list immediately after connection and start looking for rooms
-            self.looking_for_room = True
-            self.safe_emit('request_room_list')
+            import platform
+            platform_info = f" (on {platform.system()})"
+            safe_print(f"🔗 {self.name} connected to server{platform_info}")
+
+            # Add a small delay to ensure the connection is fully established
+            def request_rooms():
+                self.looking_for_room = True
+                safe_print(f"📡 {self.name}: Requesting room list after connection")
+                success = self.safe_emit('request_room_list')
+                if not success:
+                    safe_print(f"⚠️ {self.name}: Failed to request room list, retrying...")
+                    self.schedule_action(self.find_existing_room, delay=2.0)
+
+            # Use longer delay on macOS to ensure connection is fully stable
+            delay = 1.0 if platform.system() == 'Darwin' else 0.5
+            self.schedule_action(request_rooms, delay=delay)
 
         @self.sio.event
         def disconnect():
@@ -225,10 +242,22 @@ class PixelPlagiaristAI:
         def on_room_list_updated(data):
             """Handle room list response from server."""
             self.available_rooms = data['rooms']
+            safe_print(f"📋 {self.name}: Received room list with {len(self.available_rooms)} rooms")
+
+            # Log room details for debugging
+            for room in self.available_rooms:
+                room_info = f"Room {room['room_id']}: {room['player_count']}/{room['max_players']} players, phase: {room['phase']}"
+                if 'players' in room:
+                    human_count = sum(1 for p in room['players'] if not is_ai_player(p['username']))
+                    room_info += f", humans: {human_count}"
+                safe_print(f"  📊 {room_info}")
 
             # Only try to join if we're actively looking for a room
             if self.looking_for_room:
-                self.schedule_action(self.try_join_available_room)
+                safe_print(f"🎯 {self.name}: Looking for room, will attempt to join")
+                self.schedule_action(self.try_join_available_room, delay=0.5)
+            else:
+                safe_print(f"⏸️ {self.name}: Not looking for room, ignoring room list")
 
         @self.sio.on('room_created')
         def on_room_created(data):
@@ -245,6 +274,20 @@ class PixelPlagiaristAI:
 
             # Check if this room has human players after joining
             self.schedule_action(self.check_room_for_humans, delay=1.0)
+
+        @self.sio.on('join_room_error')
+        def on_join_room_error(data):
+            """Handle room join failures."""
+            error_msg = data.get('message', 'Unknown error')
+            safe_print(f"❌ {self.name}: Failed to join room - {error_msg}")
+
+            # Reset state and try again
+            self.room_id = None
+            self.player_id = None
+            self.looking_for_room = True
+
+            # Try finding a different room after a delay
+            self.schedule_action(self.find_existing_room, delay=3.0)
 
         @self.sio.on('players_updated')
         def on_players_updated(data):
@@ -312,9 +355,32 @@ class PixelPlagiaristAI:
             final_tokens = final_balances.get(self.player_id, 0)
             safe_print(f"💰 {self.name}: Final tokens: {final_tokens}")
 
-            # Stay connected and look for new rooms to join
+            # Reset state and look for new rooms to join
+            self.room_id = None
+            self.player_id = None
             self.game_phase = "waiting"
-            self.schedule_action(self.find_existing_room, delay=5.0)
+            self.current_prompt = None
+            self.copying_targets = []
+            self.voting_drawings = []
+
+            safe_print(f"🔄 {self.name}: Game ended, resetting state and looking for new room")
+            self.schedule_action(self.find_existing_room, delay=2.0)
+
+        @self.sio.on('game_ended_early')
+        def on_game_ended_early(data):
+            """Handle early game end."""
+            safe_print(f"⏹️ {self.name}: Game ended early - {data.get('reason', 'Unknown reason')}")
+
+            # Reset state and look for new rooms to join
+            self.room_id = None
+            self.player_id = None
+            self.game_phase = "waiting"
+            self.current_prompt = None
+            self.copying_targets = []
+            self.voting_drawings = []
+
+            safe_print(f"🔄 {self.name}: Early game end, resetting state and looking for new room")
+            self.schedule_action(self.find_existing_room, delay=2.0)
 
         @self.sio.on('error')
         def on_error(data):
@@ -342,8 +408,15 @@ class PixelPlagiaristAI:
         bool
             True if emission was successful, False otherwise
         """
-        if not self.connected or not self.sio.connected:
+        # Check our own connection state first, then socketio's state
+        if not self.connected:
             safe_print(f"⚠️ {self.name}: Cannot emit '{event}' - not connected")
+            return False
+            
+        if not self.sio.connected:
+            safe_print(f"⚠️ {self.name}: Cannot emit '{event}' - socketio not connected")
+            # Update our state to match socketio's state
+            self.connected = False
             return False
 
         try:
@@ -453,9 +526,12 @@ class PixelPlagiaristAI:
         safe_print(f"   AIs: {ai_players}")
 
         if len(human_players) == 0:
-            # Room has no human players - leave it
-            safe_print(f"🚪 {self.name}: Leaving room {self.room_id} - no human players remaining")
-            self.leave_room()
+            # Only leave if game is in progress - stay in waiting rooms to be available
+            if self.game_phase != "waiting":
+                safe_print(f"🚪 {self.name}: Leaving room {self.room_id} - no humans and game active")
+                self.leave_room()
+            else:
+                safe_print(f"⏳ {self.name}: No humans in waiting room {self.room_id}, but staying available")
         else:
             safe_print(f"✅ {self.name}: Staying in room {self.room_id} - found {len(human_players)} human player(s)")
 
@@ -475,37 +551,64 @@ class PixelPlagiaristAI:
         Try to join one of the available rooms from the server's room list.
         Prioritizes rooms that are waiting for players and contain human players.
         """
+        safe_print(f"🎲 {self.name}: Attempting to join available room...")
+
         if not self.connected:
             safe_print(f"⚠️ {self.name}: Cannot join room - not connected")
             return
 
         if not self.available_rooms:
-            safe_print(f"📭 {self.name}: No available rooms found, waiting...")
+            safe_print(f"📭 {self.name}: No available rooms found, will retry search...")
             self.looking_for_room = False  # Stop looking temporarily
             # Try again after a delay
             self.schedule_action(self.find_existing_room, delay=10.0)
             return
 
-        # Filter rooms by suitability - must be waiting, have space, AND have human players
+        # Filter rooms by basic suitability - must be waiting and have space
         suitable_rooms = [room for room in self.available_rooms
                           if (room['phase'] == 'waiting' and
-                              room['player_count'] < room['max_players'] and
-                              has_human_players(room))]
+                              room['player_count'] < room['max_players'])]
+
+        safe_print(f"🔍 {self.name}: Found {len(suitable_rooms)} suitable rooms out of {len(self.available_rooms)} total")
 
         if suitable_rooms:
-            # Prefer rooms that are closest to starting (more players)
-            best_room = max(suitable_rooms, key=lambda r: r['player_count'])
+            # Prioritize rooms with human players, but also consider empty rooms
+            rooms_with_humans = [room for room in suitable_rooms if has_human_players(room)]
+            empty_or_ai_rooms = [room for room in suitable_rooms if not has_human_players(room)]
+
+            if rooms_with_humans:
+                # Prefer rooms with human players, closest to starting
+                best_room = max(rooms_with_humans, key=lambda r: r['player_count'])
+                safe_print(f"🎯 {self.name}: Found room with humans, joining that")
+            elif empty_or_ai_rooms:
+                # No rooms with humans, but join empty/AI rooms to make them available
+                best_room = max(empty_or_ai_rooms, key=lambda r: r['player_count'])
+                safe_print(f"🤖 {self.name}: No humans found, joining empty/AI room to wait for humans")
+            else:
+                safe_print(f"🚫 {self.name}: No suitable rooms found, will retry...")
+                self.looking_for_room = False
+                self.schedule_action(self.find_existing_room, delay=15.0)
+                return
+
             room_id = best_room['room_id']
+            human_count = sum(1 for p in best_room.get('players', []) if not is_ai_player(p['username']))
 
             safe_print(f"🎯 {self.name}: Attempting to join room {room_id} "
-                       f"({best_room['player_count']}/{best_room['max_players']} players) "
-                       f"with human players")
+                       f"({best_room['player_count']}/{best_room['max_players']} players, "
+                       f"{human_count} humans)")
 
-            self.safe_emit('join_room', {
+            success = self.safe_emit('join_room', {
                 'room_id': room_id,
                 'username': self.name
             })
+
+            if success:
+                safe_print(f"📤 {self.name}: Join room request sent successfully")
+            else:
+                safe_print(f"❌ {self.name}: Failed to send join room request")
+                self.schedule_action(self.find_existing_room, delay=5.0)
         else:
+            safe_print(f"🚫 {self.name}: No suitable rooms found, will retry...")
             self.looking_for_room = False  # Stop looking temporarily
             # Try again after a longer delay
             self.schedule_action(self.find_existing_room, delay=15.0)
@@ -716,16 +819,35 @@ class PixelPlagiaristAI:
             return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg=="
 
     def connect_to_server(self):
-        """Connect to the game server."""
-        url = f"{'https' if self.use_ssl else 'http'}://{self.host}:{self.port}"
+        """Connect to the game server with Mac-specific handling."""
+        import platform
+
+        # On macOS, use 127.0.0.1 instead of localhost to avoid DNS issues
+        host = self.host
+        if platform.system() == 'Darwin' and self.host == 'localhost':
+            host = '127.0.0.1'
+            safe_print(f"🍎 {self.name}: On macOS, using 127.0.0.1 instead of localhost")
+
+        url = f"{'https' if self.use_ssl else 'http'}://{host}:{self.port}"
         safe_print(f"🚀 {self.name}: Connecting to {url}")
 
-        try:
-            self.sio.connect(url)
-            return True
-        except Exception as e:
-            safe_print(f"❌ {self.name}: Failed to connect - {e}")
-            return False
+        max_retries = 3 if platform.system() == 'Darwin' else 1
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    safe_print(f"🔄 {self.name}: Connection attempt {attempt + 1}/{max_retries}")
+                    time.sleep(attempt * 2)  # Exponential backoff
+
+                self.sio.connect(url, wait_timeout=10)
+                safe_print(f"✅ {self.name}: Successfully connected to server")
+                return True
+            except Exception as e:
+                safe_print(f"❌ {self.name}: Connection attempt {attempt + 1} failed - {e}")
+                if attempt == max_retries - 1:
+                    safe_print(f"💥 {self.name}: All connection attempts failed")
+                    return False
+
+        return False
 
     def disconnect(self):
         """Disconnect from the server."""

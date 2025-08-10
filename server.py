@@ -320,5 +320,5 @@ if __name__ == '__main__':
         port=port,
         debug=CONSTANTS['debug_mode'],
         allow_unsafe_werkzeug=os.getenv('WERKZEUG_ALLOW_ASYNC_UNSAFE', 'false').lower() == 'true',
-        use_reloader=os.getenv('USE_RELOADER', 'true').lower() == 'true'
+        use_reloader=os.getenv('USE_RELOADER', 'false').lower() == 'true'
     )
