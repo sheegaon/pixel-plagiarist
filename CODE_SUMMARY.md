@@ -165,7 +165,7 @@ This setup keeps code organized—focus on one handler for specific features whi
 
 This guide dives deeper into the game logic code, which is primarily housed in the `game_logic/` directory. The logic is modular, with a central game state manager coordinating specialized phase handlers, timers, and scoring. This architecture (detailed in `ARCHITECTURE.md`) ensures separation of concerns, scalability, and ease of maintenance.
 
-The game is a real-time multiplayer experience built on Flask with Socket.IO for WebSocket communication. Game instances are room-based, supporting 3-12 players. Players stake tokens (Pixel Points) into a prize pool, draw originals based on prompts, copy others' work, vote to identify originals, and earn rewards based on deception and detection skills. The code emphasizes server-authoritative state to prevent cheating, with client-side predictions for responsiveness.
+The game is a real-time multiplayer experience built on Flask with Socket.IO for WebSocket communication. Game instances are room-based, supporting 3-12 players. Players stake tokens (Bits) into a prize pool, draw originals based on prompts, copy others' work, vote to identify originals, and earn rewards based on deception and detection skills. The code emphasizes server-authoritative state to prevent cheating, with client-side predictions for responsiveness.
 
 Below, I'll break down the key modules, their classes, methods, and interactions. References to code snippets are illustrative; always check the source files for exact implementations.
 

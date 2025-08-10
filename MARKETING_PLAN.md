@@ -97,7 +97,7 @@ Focus on low-cost, organic growth to build buzz, supplemented by targeted ads. E
 ## Phase 3: Monetization and Retention
 
 ### IAP-First Approach
-- Sell token packs (e.g., 1000 Pixel Points for $0.99) for boosts/stakes.
+- Sell token packs (e.g., 1000 Bits for $0.99) for boosts/stakes.
 - Keep simulated: No real withdrawals initially.
 - Practical Advice: Use store SDKs via Capacitor. Claude Prompt: "Code IAP integration for Capacitor app."
 

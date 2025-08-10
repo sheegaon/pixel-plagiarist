@@ -180,19 +180,10 @@ class ScoringEngine:
             })
 
     def _log_game_summary(self):
-        """Log game summary to global log file and record in database"""
-        from util.game_logging import log_game_summary
-        log_game_summary(
-            room_id=self.game.room_id,
-            drawing_sets=self.game.drawing_sets,
-            votes=self.game.votes,
-            players=self.game.players,
-            player_prompts=self.game.player_prompts
-        )
-
+        """Log game summary to database"""
         # Record game completion in database for each player
         try:
-            from util.db import record_game_completion
+            from util.db import record_player_game_completion, record_drawing_sets_data
 
             for player_id, player_data in self.game.players.items():
                 balance_before = self.game.player_balances_before_game.get(player_id, player_data['balance'])
@@ -220,8 +211,10 @@ class ScoringEngine:
                 # Calculate points earned (simplified - could be more detailed)
                 points_earned = max(0, balance_after - balance_before + stake)  # Net gain plus stake back
 
-                record_game_completion(
+                # Record player data
+                record_player_game_completion(
                     username=player_data['username'],
+                    player_id=player_id,
                     room_id=self.game.room_id,
                     balance_before=balance_before,
                     balance_after=balance_after,
@@ -240,6 +233,19 @@ class ScoringEngine:
                     'votes_cast': votes_cast,
                     'correct_votes': correct_votes
                 })
+
+            # Record drawing sets data once outside the player loop
+            record_drawing_sets_data(
+                room_id=self.game.room_id,
+                drawing_sets=self.game.drawing_sets,
+                votes=self.game.votes,
+                players=self.game.players,
+                player_prompts=self.game.player_prompts
+            )
+
+            debug_log("Recorded drawing sets data for game", None, self.game.room_id, {
+                'drawing_sets_count': len(self.game.drawing_sets)
+            })
 
         except Exception as e:
             debug_log("Failed to record game completion in database", None, self.game.room_id,
