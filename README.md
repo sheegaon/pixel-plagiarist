@@ -113,6 +113,7 @@ The scoring system rewards both artistic deception and detective skills:
 - **Content moderation**: Player reporting system for inappropriate content
 
 ### Technical Features
+- **Modular architecture**: Easy to extend and customize for new features
 - **Scalable architecture**: Room-based game instances
 - **Robust error handling**: Graceful degradation and recovery
 - **Session management**: Persistent player state across connections
@@ -180,5 +181,5 @@ pixel_plagiarist/
 │   ├── css/               # Stylesheets
 │   └── images/            # Game assets
 ├── templates/             # HTML templates for rendering
-└── util/                  # Utility functions and configuration
+└── util/                  # Utility functions (logging, db) and configuration
 ```
