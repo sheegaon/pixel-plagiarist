@@ -528,3 +528,130 @@ def record_game_completion(username, room_id, balance_before, balance_after, sta
             players=players,
             player_prompts=player_prompts
         )
+
+
+def get_player_stats(username):
+    """
+    Get comprehensive statistics for a player.
+
+    Parameters
+    ----------
+    username : str
+        Player's username
+
+    Returns
+    -------
+    dict or None
+        Player statistics or None if player not found
+    """
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM players WHERE username = ?', (username,))
+            player = cursor.fetchone()
+
+            if player:
+                debug_log("DB operation: Retrieved player stats", None, None, dict(player))
+                return dict(player)
+            return None
+
+    except Exception as e:
+        debug_log("DB operation: Failed to get player stats", None, None, {
+            'error': str(e),
+            'username': username
+        })
+        return None
+
+
+def get_leaderboard(limit=50):
+    """
+    Get leaderboard data for top players.
+
+    Parameters
+    ----------
+    limit : int, optional
+        Maximum number of players to return
+
+    Returns
+    -------
+    list
+        List of player dictionaries sorted by performance metrics
+    """
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                           SELECT username,
+                                  balance,
+                                  games_played,
+                                  total_winnings,
+                                  total_losses,
+                                  successful_originals,
+                                  successful_copies,
+                                  total_originals,
+                                  total_copies,
+                                  correct_votes,
+                                  total_votes_cast,
+                                  CASE
+                                      WHEN games_played > 0 THEN CAST(total_winnings AS FLOAT) / games_played
+                                      ELSE 0
+                                      END as avg_winnings_per_game,
+                                  CASE
+                                      WHEN total_originals > 0
+                                          THEN CAST(successful_originals AS FLOAT) / total_originals * 100
+                                      ELSE 0
+                                      END as original_success_rate,
+                                  CASE
+                                      WHEN total_copies > 0 THEN CAST(successful_copies AS FLOAT) / total_copies * 100
+                                      ELSE 0
+                                      END as copy_success_rate,
+                                  CASE
+                                      WHEN total_votes_cast > 0
+                                          THEN CAST(correct_votes AS FLOAT) / total_votes_cast * 100
+                                      ELSE 0
+                                      END as vote_accuracy
+                           FROM players
+                           WHERE games_played > 0
+                           ORDER BY balance DESC, total_winnings DESC, games_played DESC LIMIT ?
+                           ''', (limit,))
+
+            players = cursor.fetchall()
+            return [dict(player) for player in players]
+
+    except Exception as e:
+        debug_log("DB operation: Failed to get leaderboard", None, None, {'error': str(e)})
+        return []
+
+
+def cleanup_old_game_history(days_old=30):
+    """
+    Clean up old game history records to prevent database bloat.
+
+    Parameters
+    ----------
+    days_old : int, optional
+        Number of days of history to keep
+    """
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                DELETE FROM game_history 
+                WHERE game_date < datetime('now', '-{} days')
+            '''.format(days_old))
+
+            deleted_count = cursor.rowcount
+            debug_log("DB operation: Cleaned up old game history", None, None, {
+                'deleted_records': deleted_count,
+                'days_old': days_old
+            })
+
+    except Exception as e:
+        debug_log("DB operation: Failed to cleanup old game history", None, None, {'error': str(e)})
+
+
+def close_connections():
+    """Close all database connections for the current thread."""
+    if hasattr(_local, 'connection'):
+        _local.connection.close()
+        delattr(_local, 'connection')
