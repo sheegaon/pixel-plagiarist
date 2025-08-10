@@ -18,7 +18,7 @@ class PlayerManager {
                     const data = await response.json();
                     this.currentBalance = data.balance;
                     this.updateBalanceDisplay();
-                    console.log(`Loaded balance for ${window.gameUserData.username}: ${this.currentBalance} Pixel Pts`);
+                    console.log(`Loaded balance for ${window.gameUserData.username}: ${this.currentBalance} Bits`);
                 } else {
                     console.warn('Failed to load player balance, using default');
                     this.updateBalanceDisplay();
@@ -57,7 +57,7 @@ class PlayerManager {
     updateBalanceDisplay() {
         const balanceElement = document.getElementById('balanceInfo');
         if (balanceElement) {
-            balanceElement.textContent = `Balance: ${Math.round(this.currentBalance)} Pixel Pts`;
+            balanceElement.textContent = `Balance: ${Math.round(this.currentBalance)} Bits`;
         }
     }
 
@@ -74,7 +74,7 @@ class PlayerManager {
         playerListElement.innerHTML = players.map(player => `
             <div class="player-item ${player.id === this.playerId ? 'current-player' : ''}">
                 <span class="player-name">${player.username || `Player ${player.id}`}</span>
-                <span class="player-balance">${Math.round(player.balance || 0)} Pixel Pts</span>
+                <span class="player-balance">${Math.round(player.balance || 0)} Bits</span>
                 ${player.ready ? '<span class="ready-indicator">✓</span>' : ''}
             </div>
         `).join('');

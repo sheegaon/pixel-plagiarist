@@ -232,17 +232,7 @@ class GameStateGL:
         debug_log("Game started with individual prompts", None, self.room_id,
                   {'player_count': len(self.players), 'drawing_timer': self.timer.get_drawing_timer_duration()})
 
-        # Emit game started event with prompt to all players
-        for player_id, prompt in self.player_prompts.items():
-            socketio.emit('game_started', {
-                'prompt': prompt,
-                'stake': self.prize_per_player,
-                'phase': 'drawing',
-                'timer': self.timer.get_drawing_timer_duration()
-            }, to=player_id)
-            debug_log("Game started with prompt", player_id, self.room_id, {'prompt': prompt, 'stake': self.prize_per_player})
-
-        # Start drawing phase
+        # Start drawing phase (clients will receive prompts within the phase_changed broadcast)
         self.drawing_phase.start_phase(socketio)
 
         # Create a new default room since this one is now in progress

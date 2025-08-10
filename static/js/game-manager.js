@@ -118,6 +118,18 @@ class GameManager {
         gameStateManager.setPhase(data.phase);
         
         if (data.phase === GameConfig.PHASES.DRAWING) {
+            // Choose this client's prompt from prompts_by_player if provided
+            if (data.prompts_by_player && window.playerManager) {
+                const pid = (typeof playerManager.getPlayerId === 'function') ? playerManager.getPlayerId() : null;
+                const ownPrompt = pid ? data.prompts_by_player[pid] : undefined;
+                if (ownPrompt) {
+                    data.prompt = ownPrompt;
+                } else if (!data.prompt) {
+                    console.warn('Prompt for this player not found in prompts_by_player; using generic prompt.');
+                    data.prompt = 'Draw something creative!';
+                }
+            }
+
             drawingManager.initializeDrawing(data);
             
             // Start drawing timer with auto-submit callback
@@ -308,7 +320,7 @@ class GameManager {
             const element = document.getElementById(id);
             if (element) {
                 if (id === 'roomInfo') element.textContent = 'Room: -';
-                else if (id === 'balanceInfo') element.textContent = `Balance: ${GameConfig.INITIAL_BALANCE} Pixel Pts`;
+                else if (id === 'balanceInfo') element.textContent = `Balance: ${GameConfig.INITIAL_BALANCE} Bits`;
                 else element.textContent = '';
             }
         });

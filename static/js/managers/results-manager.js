@@ -10,14 +10,14 @@ class ResultsManager {
         uiManager.showView('results');
         this.renderResultsInterface();
         
-        // Update player's balance and save to database
+        // Update player's balance and save to database using final balance from payload
         const currentPlayer = this.finalStandings.find(p => p.id === playerManager.getPlayerId());
         if (currentPlayer) {
-            playerManager.setBalance(currentPlayer.tokens);
+            playerManager.setBalance(currentPlayer.finalBalance);
             playerManager.updateBalanceDisplay(); // Force UI update
             
             // Save the updated balance to the database
-            this.savePlayerBalance(currentPlayer.tokens);
+            this.savePlayerBalance(currentPlayer.finalBalance);
         }
     }
 
@@ -33,7 +33,7 @@ class ResultsManager {
                     body: JSON.stringify({ balance: balance })
                 });
                 if (response.ok) {
-                    console.log(`Saved balance for ${window.gameUserData.username}: ${balance} Pixel Pts`);
+                    console.log(`Saved balance for ${window.gameUserData.username}: ${balance} Bits`);
                 } else {
                     console.warn('Failed to save player balance to server');
                 }
@@ -44,13 +44,20 @@ class ResultsManager {
     }
 
     processStandings(data) {
-        this.finalStandings = Object.entries(data.final_balances)
-            .map(([pid, tokens]) => ({
-                id: pid,
-                name: data.player_names[pid] || `Player ${pid}`,
-                tokens: Math.round(tokens)
-            }))
-            .sort((a, b) => b.tokens - a.tokens);
+        const totals = data.total_points_by_player || {};
+        const netTokens = data.net_tokens_by_player || {};
+        const finalBalances = data.final_balances || {};
+        const names = data.player_names || {};
+
+        // Build standings using total points (for ranking) and net tokens gained for display
+        this.finalStandings = Object.keys(names).map(pid => ({
+            id: pid,
+            name: names[pid] || `Player ${pid}`,
+            totalPoints: Math.round(totals[pid] || 0),
+            netTokens: Math.round(netTokens[pid] || 0),
+            finalBalance: Math.round(finalBalances[pid] || 0)
+        }))
+        .sort((a, b) => b.totalPoints - a.totalPoints);
     }
 
     renderResultsInterface() {
@@ -92,13 +99,16 @@ class ResultsManager {
             const isCurrentPlayer = player.id === playerManager.getPlayerId();
             const rankClass = index === 0 ? 'first-place' : (index < 3 ? 'top-three' : '');
             const currentPlayerClass = isCurrentPlayer ? 'current-player' : '';
+            const net = Math.round(player.netTokens);
+            const netSign = net > 0 ? '+' : '';
             
             html += `
                 <div class="standing-item ${rankClass} ${currentPlayerClass}">
                     <div class="rank">${index + 1}</div>
                     <div class="player-info">
                         <span class="name">${player.name}${isCurrentPlayer ? ' (You)' : ''}</span>
-                        <span class="tokens">${Math.round(player.tokens)} Pixel Pts</span>
+                        <span class="points">${player.totalPoints} pts</span>
+                        <span class="net-tokens">Net: ${netSign}${net} Bits</span>
                     </div>
                     ${index === 0 ? '<div class="crown">👑</div>' : ''}
                 </div>

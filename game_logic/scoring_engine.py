@@ -59,9 +59,26 @@ class ScoringEngine:
         # Log game summary to global log file
         self._log_game_summary()
 
+        # Aggregate total points per player across all sets
+        total_points_by_player = {pid: 0 for pid in self.game.players}
+        for set_result in vote_details:
+            set_scores = set_result.get('scores', {})
+            for pid, pts in set_scores.items():
+                if pid in total_points_by_player:
+                    total_points_by_player[pid] += pts
+        
+        # Compute net tokens gained in this game for each player
+        net_tokens_by_player = {}
+        for pid, pdata in self.game.players.items():
+            before = self.game.player_balances_before_game.get(pid, pdata['balance'])
+            after = pdata['balance']
+            net_tokens_by_player[pid] = after - before
+        
         # Send results
         results = {
             'final_balances': {pid: self.game.players[pid]['balance'] for pid in self.game.players},
+            'net_tokens_by_player': net_tokens_by_player,
+            'total_points_by_player': total_points_by_player,
             'vote_details': vote_details,  # Detailed scores for each drawing set, need to add code to show in UI
             'player_names': {pid: self.game.players[pid]['username'] for pid in self.game.players}
         }

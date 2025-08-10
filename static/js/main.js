@@ -171,7 +171,7 @@ class PixelPlagiarist {
         if (window.gameManager && window.gameManager.updateBalanceDisplay) {
             setTimeout(() => {
                 window.gameManager.updateBalanceDisplay();
-                debug(`Initial balance set to: ${GameConfig.INITIAL_BALANCE} Pixel Pts`);
+                debug(`Initial balance set to: ${GameConfig.INITIAL_BALANCE} Bits`);
             }, 10);
         }
         

@@ -35,14 +35,13 @@ class DrawingPhase:
                     'new_balance': player['balance']
                 })
 
-        # Emit individual phase change events with prompts to each player
-        for player_id in self.game.players:
-            player_prompt = self.game.player_prompts.get(player_id, "Draw something creative!")
-            socketio.emit('phase_changed', {
-                'phase': 'drawing',
-                'prompt': player_prompt,
-                'timer': self.game.timer.get_drawing_timer_duration()
-            }, to=player_id)
+        # Emit a single phase change event with all prompts for clients to pick their own
+        prompts_by_player = {pid: self.game.player_prompts.get(pid) for pid in self.game.players}
+        socketio.emit('phase_changed', {
+            'phase': 'drawing',
+            'timer': self.game.timer.get_drawing_timer_duration(),
+            'prompts_by_player': prompts_by_player
+        }, room=self.game.room_id)
 
         self.game.timer.start_phase_timer(
             socketio, 
