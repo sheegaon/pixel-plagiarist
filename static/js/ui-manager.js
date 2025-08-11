@@ -79,7 +79,14 @@ class UIManager {
 
     startCountdown(seconds) {
         const timer = document.getElementById('joiningTimer');
+        if (!timer) return;
         let timeLeft = seconds;
+        
+        // Clear any previous joining countdown interval
+        if (this.timers.has('joiningTimer')) {
+            clearInterval(this.timers.get('joiningTimer'));
+            this.timers.delete('joiningTimer');
+        }
         
         // Set initial value immediately
         timer.textContent = timeLeft;
@@ -90,9 +97,13 @@ class UIManager {
             
             if (timeLeft <= 0) {
                 clearInterval(interval);
+                this.timers.delete('joiningTimer');
                 timer.textContent = "Starting...";
             }
         }, 1000);
+        
+        // Track the joining countdown interval so it can be cleared on leave
+        this.timers.set('joiningTimer', interval);
     }
 
     showReviewOverlay(drawing, duration) {
@@ -149,9 +160,19 @@ class UIManager {
         timerElements.forEach(id => {
             const element = document.getElementById(id);
             if (element) {
-                element.textContent = '0:00';
+                if (id === 'joiningTimer') {
+                    element.textContent = '';
+                } else {
+                    element.textContent = '0:00';
+                }
             }
         });
+
+        // Hide countdown container if present
+        const countdownDisplay = document.getElementById('countdownDisplay');
+        if (countdownDisplay) {
+            countdownDisplay.style.display = 'none';
+        }
     }
 
     reset() {

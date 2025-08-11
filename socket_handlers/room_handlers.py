@@ -210,17 +210,15 @@ class RoomHandlers:
 
             # If we're below minimum players and countdown was active, cancel it
             if len(game.players) < game.min_players:
-                if hasattr(game, 'countdown_timer') and game.countdown_timer:
-                    game._stop_countdown = True  # Use the flag instead of cancel()
-                    game.countdown_timer = None
-                    game.countdown_start_time = None
-                    debug_log("Countdown cancelled - below minimum players", None, room_id,
-                              {'player_count': len(game.players)})
+                # Stop the joining countdown via the Timer component to ensure proper cleanup
+                game.timer.stop_joining_countdown()
+                debug_log("Countdown cancelled - below minimum players", None, room_id,
+                          {'player_count': len(game.players)})
 
-                    # Hide countdown for remaining players
-                    emit('countdown_cancelled', {
-                        'message': 'Countdown cancelled - need more players'
-                    }, room=room_id)
+                # Hide countdown for remaining players
+                emit('countdown_cancelled', {
+                    'message': 'Countdown cancelled - need more players'
+                }, room=room_id)
 
         # Broadcast updated room list to all clients
         broadcast_room_list()

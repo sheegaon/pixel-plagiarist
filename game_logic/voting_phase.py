@@ -26,6 +26,12 @@ class VotingPhase:
         self.current_set_started = False  # Prevent duplicate set starts
         self.set_start_time = None  # Track when the current set started
 
+    def reset_for_new_game(self):
+        """Reset flags and timers for a fresh game in this room"""
+        self.drawing_sets_created = False
+        self.current_set_started = False
+        self.set_start_time = None
+
     def start_phase(self, socketio):
         """Start the voting phase"""
         # Check if game has ended early - if so, don't start voting phase

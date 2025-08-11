@@ -92,30 +92,40 @@ class ResultsManager {
             <div class="your-rank">
                 <p>Your Rank: <strong>${playerRank}/${totalPlayers}</strong></p>
             </div>
-            <div class="standings-list">
+            <div class="results-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Player</th>
+                            <th>Points</th>
+                            <th>Net Bits</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
         
         this.finalStandings.forEach((player, index) => {
             const isCurrentPlayer = player.id === playerManager.getPlayerId();
-            const rankClass = index === 0 ? 'first-place' : (index < 3 ? 'top-three' : '');
-            const currentPlayerClass = isCurrentPlayer ? 'current-player' : '';
             const net = Math.round(player.netTokens);
             const netSign = net > 0 ? '+' : '';
+            const rowClass = isCurrentPlayer ? 'current-player' : '';
             
             html += `
-                <div class="standing-item ${rankClass} ${currentPlayerClass}">
-                    <div class="rank">${index + 1}</div>
-                    <div class="player-info">
-                        <span class="name">${player.name}${isCurrentPlayer ? ' (You)' : ''}</span>
-                        <span class="points">${player.totalPoints} pts</span>
-                        <span class="net-tokens">Net: ${netSign}${net} Bits</span>
-                    </div>
-                    ${index === 0 ? '<div class="crown">👑</div>' : ''}
-                </div>
+                        <tr class="${rowClass}">
+                            <td class="rank">${index + 1}${index === 0 ? ' 👑' : ''}</td>
+                            <td class="name">${player.name}${isCurrentPlayer ? ' (You)' : ''}</td>
+                            <td class="points">${player.totalPoints}</td>
+                            <td class="net-tokens">${netSign}${net}</td>
+                        </tr>
             `;
         });
         
-        html += '</div>';
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
         return html;
     }
 

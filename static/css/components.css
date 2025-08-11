@@ -938,3 +938,33 @@
         align-self: flex-end;
     }
 }
+.results-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.results-table th, .results-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+}
+
+.results-table thead th {
+    background: #f1f5f9;
+    font-weight: 600;
+}
+
+.results-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.results-table tbody tr.current-player {
+    background: #fffdea;
+    font-weight: 600;
+}
+
+.results-table td.rank {
+    width: 80px;
+    font-weight: 600;
+}

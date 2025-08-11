@@ -211,11 +211,21 @@ class GameStateGL:
 
         # Ensure joining countdown timer is stopped
         self.timer.stop_joining_countdown()
-
+        
+        # Reset per-game state for a fresh start
+        self.original_drawings = {}
+        self.copied_drawings = {}
+        self.copy_assignments = {}
+        self.votes = {}
+        self.idx_current_drawing_set = 0
+        self.drawing_sets = []
+        self.percentage_penalties = {}
+        
         # Reset phase handlers for new game
         self.copying_phase.reset_for_new_game()
+        self.voting_phase.reset_for_new_game()
         self.scoring_engine.results_calculated = False
-
+        
         # Update phase to drawing
         self.phase = "drawing"
 

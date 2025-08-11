@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 """
 Pixel Plagiarist AI Player
 Automated client that connects to the Pixel Plagiarist game server and plays autonomously.
